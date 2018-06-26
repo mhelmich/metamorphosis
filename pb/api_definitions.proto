@@ -1,0 +1,104 @@
+/*
+ * Copyright 2018 Marco Helmich
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+
+package pb;
+
+import "gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+option (gogoproto.goproto_enum_prefix_all) = false;
+
+service MetamorphosisService {
+  rpc Put(PutRequest) returns (PutResponse) {}
+  rpc Get(GetRequest) returns (GetResponse) {}
+  rpc List(ListRequest) returns (ListResponse) {}
+}
+
+message PutRequest {
+  string Key = 1;
+  string Value = 2;
+}
+
+message PutResponse {
+}
+
+message GetRequest {
+  string Key = 1;
+}
+
+message GetResponse {
+  string Value = 1;
+}
+
+message ListRequest {
+}
+
+message ListResponse {
+  map<string, string> m = 1;
+}
+
+ // Incredibly simple pub-sub service definition.
+service PubSubService {
+  rpc Publish(stream PublishRequest) returns (stream PublishResponse) {}
+  rpc Subscribe(stream SubscribeRequest) returns (stream SubscribeResponse) {}
+}
+
+// Sending a publish request starts a new publisher session on metamorphosis.
+// The first request in the stream requires the topic field to be set.
+// Failure to do so will fail the session.
+// From then on the provided entry will be appended to the log.
+// Setting the topic field to a different value will have no effect (the value
+// of the field will be ignored from then on).
+// In order to publish to a different topic the stream needs to be closed and
+// a new stream needs to be created.
+// When a topic is provided that doesn't exist, a topic with this name will be created.
+message PublishRequest {
+  string Topic = 1;
+  bytes EntryKey = 2;
+  bytes EntryData = 3;
+}
+
+// For each publish request a corresponding response will be sent.
+// The response will contain the entry key that has been committed by metamorphosis.
+message PublishResponse {
+  bytes CommittedEntryKey = 1;
+}
+
+
+// Sending a subcribe request starts a new subscription session on metamorphosis.
+// The first request in the stream requires the topic and starting entry key fields to be set.
+// The subcription topic is valid over the life time of the entire session and the value of the
+// topic field will be ignored in subsequent requests in the stream.
+// Failure to provide the name of an existing topic will result in closing the session with an error.
+// The starting entry key is the entry at which the log will be read.
+// The committed entry key field defines the place at which the log be started read within this session.
+// metamorphosis is free to discard entries that have been read by a session whenever it seems fit.
+// Failure to provide a reasonable combination of starting entry and committed entry will result in a failure and close of the session.
+message SubscribeRequest {
+  string Topic = 1;
+  bytes StartingEntryKey = 2;
+  bytes CommittedEntryKey = 3;
+}
+
+message SubscribeResponse {
+  bytes EntryKey = 1;
+  bytes EntryData = 2;
+}
