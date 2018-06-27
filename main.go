@@ -49,7 +49,9 @@ func main() {
 
 	copycatConfig := copycat.DefaultConfig()
 	// set host name to external IP address
-	copycatConfig.Hostname = getOutboundIP().To4().String()
+	// copycatConfig.Hostname = getOutboundIP().To4().String()
+	// DEBUG - hardwire loopback for now
+	copycatConfig.Hostname = "127.0.0.1"
 	copycatConfig.CopyCatPort = viperConfig.GetInt("copycat-port")
 	copycatConfig.GossipPort = viperConfig.GetInt("gossip-port")
 	copycatConfig.CopyCatDataDir = viperConfig.GetString("copycat-dir")
