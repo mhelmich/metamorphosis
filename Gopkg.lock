@@ -117,7 +117,7 @@
     ".",
     "pb"
   ]
-  revision = "336daa26f898f62c0ff4e8d113416e4dda27ea45"
+  revision = "0ce1c907ea562d3872ba303dbfbd6303da92f0cb"
 
 [[projects]]
   name = "github.com/miekg/dns"
