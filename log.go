@@ -117,7 +117,7 @@ func (l *log) serveChannels() {
 				l.mutex.Unlock()
 			}
 
-			defer l.maybeCompact()
+			go l.maybeCompact()
 		}
 	}
 }
