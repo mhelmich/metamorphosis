@@ -17,7 +17,10 @@
 package main
 
 import (
+	"bytes"
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -33,8 +36,16 @@ import (
 func main() {
 	logrus.Infof("Starting metamorphosis!")
 
-	viperConfig := viper.New()
-	viperConfig.AutomaticEnv()
+	configPath := flag.String("config", "./config.yml", "a string")
+	flag.Parse()
+	if !flag.Parsed() {
+		logrus.Panic("Couldn't part command line")
+	}
+
+	viperConfig, err := loadConfig(*configPath)
+	if err != nil {
+		logrus.Panicf("Can't load configs: %s", err)
+	}
 
 	copycatConfig := copycat.DefaultConfig()
 	// set host name to external IP address
@@ -63,7 +74,7 @@ func main() {
 		cleanup(sig, copycatConfig.CopyCatDataDir, cc)
 	}()
 
-	startHTTPServer(httpPort)
+	startHTTPServer(httpPort, cc)
 }
 
 // get preferred outbound ip of this machine
@@ -80,10 +91,14 @@ func getOutboundIP() net.IP {
 	return localAddr.IP
 }
 
-func startHTTPServer(port int) {
+func startHTTPServer(port int, cc copycat.CopyCat) {
 	logrus.Infof("Firing up http server...")
+	l, err := newLog(cc)
+	if err != nil {
+		logrus.Panicf("Can't create log: %s", err.Error())
+	}
 	ws := &httpServer{
-		theLog: &log{},
+		theLog: l,
 	}
 
 	mux := http.NewServeMux()
@@ -91,6 +106,33 @@ func startHTTPServer(port int) {
 	mux.HandleFunc("/appendLogEntry", ws.appendLogEntry)
 	http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", port), mux)
 	logrus.Error("Stopped http server!")
+}
+
+// func startGrpcServer(port int) {
+// 	logrus.Infof("Firing up grpc server...")
+// 	lis, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+// 	if err != nil {
+// 		logrus.Panicf("%s", err.Error())
+// 	}
+//
+// 	grpcServer := grpc.NewServer()
+// 	pb.RegisterPubSubServiceServer(grpcServer, &pubSubServer{})
+// 	grpcServer.Serve(lis)
+// 	logrus.Error("Stopped grpc server!")
+// }
+
+func loadConfig(configPath string) (*viper.Viper, error) {
+	logrus.Infof("Loading config at %s", configPath)
+	viperConfig := viper.New()
+	viperConfig.AutomaticEnv()
+	viperConfig.SetConfigType("yaml")
+	bites, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	err = viperConfig.ReadConfig(bytes.NewBuffer(bites))
+	return viperConfig, err
 }
 
 func cleanup(sig os.Signal, dataDir string, cc copycat.CopyCat) {

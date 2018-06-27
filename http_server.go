@@ -17,6 +17,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -28,6 +29,7 @@ type httpServer struct {
 	theLog *log
 }
 
+// naive implementation
 func (s *httpServer) inspectLog(w http.ResponseWriter, r *http.Request) {
 	bites, err := s.theLog.snapshotProvider()
 	if err != nil {
@@ -56,8 +58,16 @@ func (s *httpServer) inspectLog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *httpServer) appendLogEntry(w http.ResponseWriter, r *http.Request) {
-	// key := ulid.MustNew(ulid.Now(), rand.Reader)
-	// value := ulid.MustNew(ulid.Now(), rand.Reader)
-	// s.theMap.put(key.String(), value.String())
-	// io.WriteString(w, key.String()+" => "+value.String())
+	key := make([]byte, 16)
+	value := make([]byte, 16)
+	rand.Read(key)
+	rand.Read(value)
+	offset := s.theLog.append(key, value)
+	j, err := json.Marshal(offset)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	io.WriteString(w, string(j))
 }

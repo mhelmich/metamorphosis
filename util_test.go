@@ -14,27 +14,16 @@
  * limitations under the License.
  */
 
-syntax = "proto3";
+package main
 
-package pb;
+import "sync"
 
-import "gogoproto/gogo.proto";
+func sizeOfMap(m *sync.Map) int {
+	var i int
+	m.Range(func(key, value interface{}) bool {
+		i++
+		return true
+	})
 
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_getters_all) = false;
-option (gogoproto.goproto_enum_prefix_all) = false;
-
-message LogEntry {
-  uint64 Offset = 1;
-  bytes Key = 2;
-  bytes Value = 3;
-}
-
-message MetamorphosisLog {
-  // this map will contain keys and values from the log in compacted form
-  map<string, bytes> state = 1;
-  // this will contain all log entries with the map as base state
-  repeated LogEntry log = 2;
+	return i
 }
