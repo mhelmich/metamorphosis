@@ -18,15 +18,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mhelmich/copycat"
 	"github.com/sirupsen/logrus"
@@ -71,12 +71,16 @@ func main() {
 		logrus.Panicf("Can't start app: %s", err.Error())
 	}
 
+	httpServer := newHttpServer(httpPort, cc)
 	go func() {
-		sig := <-c
-		cleanup(sig, copycatConfig.CopyCatDataDir, cc)
+		logrus.Infof("Firing up http server...")
+		if err := httpServer.ListenAndServe(); err != nil {
+			logrus.Errorf("%s", err.Error())
+		}
 	}()
 
-	startHTTPServer(httpPort, cc)
+	sig := <-c
+	cleanup(sig, copycatConfig.CopyCatDataDir, cc, httpServer)
 }
 
 // get preferred outbound ip of this machine
@@ -91,23 +95,6 @@ func getOutboundIP() net.IP {
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	// get the IP from an open connection
 	return localAddr.IP
-}
-
-func startHTTPServer(port int, cc copycat.CopyCat) {
-	logrus.Infof("Firing up http server...")
-	l, err := newLog(cc)
-	if err != nil {
-		logrus.Panicf("Can't create log: %s", err.Error())
-	}
-	ws := &httpServer{
-		theLog: l,
-	}
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/inspectLog", ws.inspectLog)
-	mux.HandleFunc("/appendLogEntry", ws.appendLogEntry)
-	http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", port), mux)
-	logrus.Error("Stopped http server!")
 }
 
 // func startGrpcServer(port int) {
@@ -137,10 +124,16 @@ func loadConfig(configPath string) (*viper.Viper, error) {
 	return viperConfig, err
 }
 
-func cleanup(sig os.Signal, dataDir string, cc copycat.CopyCat) {
+func cleanup(sig os.Signal, dataDir string, cc copycat.CopyCat, httpServer *httpServer) {
 	logrus.Info("This node is going down gracefully\n")
 	logrus.Infof("Received signal: %s\n", sig)
+
 	cc.Shutdown()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	httpServer.Shutdown(ctx)
+
 	err := os.RemoveAll(dataDir)
 	if err != nil {
 		logrus.Errorf("Can't clean up after myself: %s", err.Error())
