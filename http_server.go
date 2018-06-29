@@ -17,17 +17,92 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
+	"hash/fnv"
 	"io"
 	"net/http"
+	"time"
 
+	"github.com/gorilla/mux"
+	"github.com/mhelmich/copycat"
 	"github.com/mhelmich/metamorphosis/pb"
+	"github.com/sirupsen/logrus"
 )
 
+func newHttpServer(port int, cc copycat.CopyCat) *httpServer {
+	l, err := newLog(cc)
+	if err != nil {
+		logrus.Panicf("Can't create log: %s", err.Error())
+	}
+
+	router := mux.NewRouter().StrictSlash(true)
+	httpServer := &httpServer{
+		Server: http.Server{
+			Addr:         fmt.Sprintf("127.0.0.1:%d", port),
+			Handler:      router,
+			WriteTimeout: time.Second * 15,
+			ReadTimeout:  time.Second * 15,
+			IdleTimeout:  time.Second * 60,
+		},
+		theLog: l,
+		cc:     cc,
+	}
+
+	// set up routes
+	router.
+		Methods("GET").
+		Path("/inspectLog").
+		HandlerFunc(httpServer.inspectLog).
+		Name("inspectLog")
+
+	router.
+		Methods("GET").
+		Path("/appendLogEntry").
+		HandlerFunc(httpServer.appendLogEntry).
+		Name("appendLogEntry")
+
+	router.
+		Methods("GET").
+		Path("/createTopic/{topic}").
+		HandlerFunc(httpServer.createTopic).
+		Name("createTopic")
+
+	return httpServer
+}
+
 type httpServer struct {
+	http.Server
+	cc     copycat.CopyCat
 	theLog *log
 }
 
+func (s *httpServer) createTopic(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	// TODO - hash a topic name to create a copycat id???
+	// let's think this through again
+	h := fnv.New128()
+	h.Write([]byte(vars["topic"]))
+	bites := h.Sum(nil)
+
+	a := make([]interface{}, 2)
+	a[0] = len(bites)
+	a[1] = bites
+
+	j, err := json.Marshal(a)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	io.WriteString(w, string(j))
+}
+
+// naive implementation
 func (s *httpServer) inspectLog(w http.ResponseWriter, r *http.Request) {
 	bites, err := s.theLog.snapshotProvider()
 	if err != nil {
@@ -52,12 +127,24 @@ func (s *httpServer) inspectLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
 	io.WriteString(w, string(j))
 }
 
 func (s *httpServer) appendLogEntry(w http.ResponseWriter, r *http.Request) {
-	// key := ulid.MustNew(ulid.Now(), rand.Reader)
-	// value := ulid.MustNew(ulid.Now(), rand.Reader)
-	// s.theMap.put(key.String(), value.String())
-	// io.WriteString(w, key.String()+" => "+value.String())
+	key := make([]byte, 16)
+	value := make([]byte, 16)
+	rand.Read(key)
+	rand.Read(value)
+	offset := s.theLog.append(key, value)
+	j, err := json.Marshal(offset)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	io.WriteString(w, string(j))
 }

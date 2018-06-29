@@ -19,6 +19,7 @@ package main
 import (
 	"bytes"
 	"container/list"
+	"fmt"
 	"sync"
 	"time"
 
@@ -27,12 +28,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// recommended reading:
+// https://www.cockroachlabs.com/blog/serializable-lockless-distributed-isolation-cockroachdb/
+// https://www.cockroachlabs.com/blog/how-cockroachdb-distributes-atomic-transactions/
+// https://www.cockroachlabs.com/blog/sql-in-cockroachdb-mapping-table-data-to-key-value-storage/
+
 type log struct {
-	log        *list.List
-	mutex      *sync.RWMutex
-	snapshot   *sync.Map
-	nextOffset uint64
-	maxLogSize int
+	log         *list.List
+	mutex       *sync.RWMutex
+	offsetMutex *sync.Mutex
+	snapshot    *sync.Map
+	nextOffset  uint64
+	maxLogSize  int
 
 	proposeCh        chan<- []byte
 	commitCh         <-chan []byte
@@ -42,10 +49,11 @@ type log struct {
 
 func newLog(cc copycat.CopyCat) (*log, error) {
 	l := &log{
-		log:        &list.List{},
-		mutex:      &sync.RWMutex{},
-		snapshot:   &sync.Map{},
-		maxLogSize: 1000,
+		log:         &list.List{},
+		mutex:       &sync.RWMutex{},
+		offsetMutex: &sync.Mutex{},
+		snapshot:    &sync.Map{},
+		maxLogSize:  1000,
 	}
 
 	var err error
@@ -78,16 +86,26 @@ func (l *log) serveChannels() {
 					logrus.Errorf("Error unmarshaling snapshot: %s", err.Error())
 				}
 
+				wg := &sync.WaitGroup{}
+				wg.Add(2)
+
 				newSnap := &sync.Map{}
-				for _, v := range protobuf.State {
-					newSnap.Store(v.Key, v.Value)
-				}
+				go func() {
+					for k, v := range protobuf.State {
+						newSnap.Store(k, v)
+					}
+					wg.Done()
+				}()
 
 				newLog := &list.List{}
-				for _, item := range protobuf.Log {
-					newLog.PushBack(item)
-				}
+				go func() {
+					for _, item := range protobuf.Log {
+						newLog.PushBack(item)
+					}
+					wg.Done()
+				}()
 
+				wg.Wait()
 				l.mutex.Lock()
 				l.log = newLog
 				l.snapshot = newSnap
@@ -101,10 +119,11 @@ func (l *log) serveChannels() {
 
 				l.mutex.Lock()
 				l.log.PushBack(le)
+				l.nextOffset = le.Offset + 1
 				l.mutex.Unlock()
 			}
 
-			defer l.maybeCompact()
+			go l.maybeCompact()
 		}
 	}
 }
@@ -113,16 +132,14 @@ func (l *log) maybeCompact() {
 	if l.log.Len() > l.maxLogSize {
 		l.mutex.Lock()
 		if l.log.Len() > l.maxLogSize {
-			i := 0
 			var prevElement *list.Element
-			for e := l.log.Front(); e != nil || i >= l.maxLogSize; e = e.Next() {
+			for e := l.log.Front(); e != nil && l.log.Len() > l.maxLogSize; e = e.Next() {
 				if prevElement != nil {
 					l.log.Remove(prevElement)
 				}
 				entry := e.Value.(*pb.LogEntry)
-				l.snapshot.Store(entry.Key, entry.Value)
+				l.snapshot.Store(string(entry.Key), entry.Value)
 				prevElement = e
-				i++
 			}
 			l.log.Remove(prevElement)
 		}
@@ -131,7 +148,6 @@ func (l *log) maybeCompact() {
 }
 
 func (l *log) snapshotProvider() ([]byte, error) {
-	m := make(map[string]*pb.LogEntry)
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	done := make(chan struct{})
@@ -139,11 +155,13 @@ func (l *log) snapshotProvider() ([]byte, error) {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
 	log := make([]*pb.LogEntry, l.log.Len())
+	m := make(map[string][]byte)
 
 	go func() {
 		l.snapshot.Range(func(key interface{}, value interface{}) bool {
-			entry := value.(*pb.LogEntry)
-			m[string(entry.Key)] = entry
+			k := key.(string)
+			v := value.([]byte)
+			m[k] = v
 			return true
 		})
 		wg.Done()
@@ -182,13 +200,41 @@ func (l *log) append(key []byte, value []byte) uint64 {
 		Value: value,
 	}
 
-	l.mutex.Lock()
+	l.offsetMutex.Lock()
 	entry.Offset = l.nextOffset
 	l.nextOffset++
-	l.log.PushBack(entry)
-	l.mutex.Unlock()
+	bites, err := entry.Marshal()
+	if err != nil {
+		logrus.Errorf("Can't marshal append: %s", err.Error())
+	}
+	l.proposeCh <- bites
+	l.offsetMutex.Unlock()
 
 	return entry.Offset
+}
+
+func (l *log) readFromOffset(startingOffset uint64, maxBatchSize int) ([]*pb.LogEntry, error) {
+	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+
+	head := l.log.Front()
+	headEntry := head.Value.(*pb.LogEntry)
+
+	if headEntry.Offset > startingOffset {
+		return nil, fmt.Errorf("Offset too old")
+	}
+
+	entries := make([]*pb.LogEntry, maxBatchSize)
+	idx := 0
+	for e := head; e != nil && idx < maxBatchSize; e = e.Next() {
+		entry := e.Value.(*pb.LogEntry)
+		if entry.Offset >= startingOffset {
+			entries[idx] = entry
+			idx++
+		}
+	}
+
+	return entries[:idx], nil
 }
 
 func (l *log) readKey(key []byte, startingOffset uint64) *pb.LogEntry {
