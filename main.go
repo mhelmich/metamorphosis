@@ -36,10 +36,10 @@ import (
 func main() {
 	logrus.Infof("Starting metamorphosis!")
 
-	configPath := flag.String("config", "./config.yml", "a string")
+	configPath := flag.String("config", "./default_config.yml", "path to config file for metamorphosis to use")
 	flag.Parse()
 	if !flag.Parsed() {
-		logrus.Panic("Couldn't part command line")
+		logrus.Panic("Couldn't parse command line")
 	}
 
 	viperConfig, err := loadConfig(*configPath)
@@ -59,8 +59,9 @@ func main() {
 	// docker only allows for capitilized env vars!?!
 	copycatConfig.PeersToContact = viperConfig.GetStringSlice("COPYCAT_PEERS")
 	httpPort := viperConfig.GetInt("http-port")
-	_ = viperConfig.GetInt("grpc-port")
+	grpcPort := viperConfig.GetInt("grpc-port")
 	logrus.Infof("Starting copycat with: %d %d %s %s %s", copycatConfig.CopyCatPort, copycatConfig.GossipPort, copycatConfig.CopyCatDataDir, copycatConfig.Hostname, strings.Join(copycatConfig.PeersToContact, ", "))
+	logrus.Infof("Starting metamorphosis with: %d %d", httpPort, grpcPort)
 
 	// register shutdown hook and call cleanup
 	c := make(chan os.Signal, 1)
