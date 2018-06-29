@@ -14,6 +14,9 @@
 # limitations under the License.
 #
 
+# NOTE: Be careful when changing this!!
+# This config file goes into the prod docker container as fallback.
+
 http-port: 8080
 grpc-port: 8081
 copycat-port: 15000
