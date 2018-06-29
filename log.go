@@ -28,6 +28,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// recommended reading:
+// https://www.cockroachlabs.com/blog/serializable-lockless-distributed-isolation-cockroachdb/
+// https://www.cockroachlabs.com/blog/how-cockroachdb-distributes-atomic-transactions/
+// https://www.cockroachlabs.com/blog/sql-in-cockroachdb-mapping-table-data-to-key-value-storage/
+
 type log struct {
 	log         *list.List
 	mutex       *sync.RWMutex
