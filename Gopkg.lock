@@ -129,11 +129,7 @@
     ".",
     "pb"
   ]
-<<<<<<< HEAD
-  revision = "0f3a40144866cfeab8332582e568647b84d7fe37"
-=======
   revision = "0ce1c907ea562d3872ba303dbfbd6303da92f0cb"
->>>>>>> 3ffc7f8158988372dab4f3d22ab2a62648d0d652
 
 [[projects]]
   name = "github.com/miekg/dns"
@@ -325,10 +321,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-<<<<<<< HEAD
-  inputs-digest = "74cbf76771f09c081684910e320a592f8c3a44d6b0551100bdfb5b23db5ea1ca"
-=======
   inputs-digest = "01c45c3466d9ed0c7cd4124ac208a8f359d84a5fda1bda900cb2abd81f5f0da4"
->>>>>>> 3ffc7f8158988372dab4f3d22ab2a62648d0d652
   solver-name = "gps-cdcl"
   solver-version = 1
