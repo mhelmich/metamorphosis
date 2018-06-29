@@ -114,6 +114,7 @@ func (l *log) serveChannels() {
 
 				l.mutex.Lock()
 				l.log.PushBack(le)
+				l.nextOffset = le.Offset + 1
 				l.mutex.Unlock()
 			}
 
