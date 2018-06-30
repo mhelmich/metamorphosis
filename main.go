@@ -74,7 +74,7 @@ func main() {
 
 	httpServer := newHttpServer(httpPort, cc)
 	go func() {
-		logrus.Infof("Firing up http server...")
+		logrus.Infof("Firing up http server on %s", httpServer.Addr)
 		if err := httpServer.ListenAndServe(); err != nil {
 			logrus.Errorf("%s", err.Error())
 		}
