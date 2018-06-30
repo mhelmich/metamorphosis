@@ -40,7 +40,7 @@ func newHttpServer(port int, cc copycat.CopyCat) *httpServer {
 	router := mux.NewRouter().StrictSlash(true)
 	httpServer := &httpServer{
 		Server: http.Server{
-			Addr:         fmt.Sprintf("127.0.0.1:%d", port),
+			Addr:         fmt.Sprintf(":%d", port),
 			Handler:      router,
 			WriteTimeout: time.Second * 15,
 			ReadTimeout:  time.Second * 15,
