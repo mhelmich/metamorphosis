@@ -195,14 +195,12 @@ func (l *log) snapshotProvider() ([]byte, error) {
 }
 
 func (l *log) append(key []byte, value []byte) uint64 {
-	entry := &pb.LogEntry{
-		Key:   key,
-		Value: value,
-	}
-
 	l.offsetMutex.Lock()
-	entry.Offset = l.nextOffset
-	l.nextOffset++
+	entry := &pb.LogEntry{
+		Key:    key,
+		Value:  value,
+		Offset: l.nextOffset,
+	}
 	bites, err := entry.Marshal()
 	if err != nil {
 		logrus.Errorf("Can't marshal append: %s", err.Error())
