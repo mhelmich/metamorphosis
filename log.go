@@ -47,7 +47,7 @@ type log struct {
 	snapshotConsumer copycat.SnapshotConsumer
 }
 
-func newLog(cc copycat.CopyCat) (*log, error) {
+func newLog(dataStructureId string, cc copycat.CopyCat) (*log, error) {
 	l := &log{
 		log:         &list.List{},
 		mutex:       &sync.RWMutex{},
@@ -57,7 +57,7 @@ func newLog(cc copycat.CopyCat) (*log, error) {
 	}
 
 	var err error
-	l.proposeCh, l.commitCh, l.errorCh, l.snapshotConsumer, err = cc.SubscribeToDataStructureWithStringID("01CFRDSD7PBQZXV8N515RVYTZQ", l.snapshotProvider)
+	l.proposeCh, l.commitCh, l.errorCh, l.snapshotConsumer, err = cc.SubscribeToDataStructureWithStringID(dataStructureId, l.snapshotProvider)
 	if err != nil {
 		return nil, err
 	}

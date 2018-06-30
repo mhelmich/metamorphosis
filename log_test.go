@@ -29,7 +29,7 @@ import (
 
 func TestLogAppendReadBasic(t *testing.T) {
 	cc := newMockCopyCat()
-	log, err := newLog(cc)
+	log, err := newLog("01CFRDSD7PBQZXV8N515RVYTZQ", cc)
 	assert.Nil(t, err)
 
 	keyPrefix := "key_"
@@ -57,7 +57,7 @@ func TestLogAppendReadBasic(t *testing.T) {
 
 func TestLogBasic(t *testing.T) {
 	cc := newMockCopyCat()
-	log, err := newLog(cc)
+	log, err := newLog("01CFRDSD7PBQZXV8N515RVYTZQ", cc)
 	assert.Nil(t, err)
 	log.maxLogSize = 33
 

@@ -23,6 +23,7 @@ import (
 	"hash/fnv"
 	"io"
 	"net/http"
+	"net/http/pprof"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -32,7 +33,7 @@ import (
 )
 
 func newHttpServer(port int, cc copycat.CopyCat) *httpServer {
-	l, err := newLog(cc)
+	l, err := newLog("01CFRDSD7PBQZXV8N515RVYTZQ", cc)
 	if err != nil {
 		logrus.Panicf("Can't create log: %s", err.Error())
 	}
@@ -42,8 +43,8 @@ func newHttpServer(port int, cc copycat.CopyCat) *httpServer {
 		Server: http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
 			Handler:      router,
-			WriteTimeout: time.Second * 15,
-			ReadTimeout:  time.Second * 15,
+			WriteTimeout: time.Second * 60,
+			ReadTimeout:  time.Second * 60,
 			IdleTimeout:  time.Second * 60,
 		},
 		theLog: l,
@@ -68,6 +69,27 @@ func newHttpServer(port int, cc copycat.CopyCat) *httpServer {
 		Path("/createTopic/{topic}").
 		HandlerFunc(httpServer.createTopic).
 		Name("createTopic")
+
+		// drag in pprof endpoints
+	router.
+		Path("/debug/pprof/").
+		HandlerFunc(pprof.Index)
+
+	router.
+		Path("/debug/pprof/cmdline").
+		HandlerFunc(pprof.Cmdline)
+
+	router.
+		Path("/debug/pprof/profile").
+		HandlerFunc(pprof.Profile)
+
+	router.
+		Path("/debug/pprof/symbol").
+		HandlerFunc(pprof.Symbol)
+
+	router.
+		Path("/debug/pprof/trace").
+		HandlerFunc(pprof.Trace)
 
 	return httpServer
 }
