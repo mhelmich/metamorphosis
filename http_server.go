@@ -23,7 +23,7 @@ import (
 	"hash/fnv"
 	"io"
 	"net/http"
-	"net/http/pprof"
+	netpprof "net/http/pprof"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -70,26 +70,27 @@ func newHttpServer(port int, cc copycat.CopyCat) *httpServer {
 		HandlerFunc(httpServer.createTopic).
 		Name("createTopic")
 
-		// drag in pprof endpoints
-	router.
-		Path("/debug/pprof/").
-		HandlerFunc(pprof.Index)
-
+	// drag in pprof endpoints
 	router.
 		Path("/debug/pprof/cmdline").
-		HandlerFunc(pprof.Cmdline)
+		HandlerFunc(netpprof.Cmdline)
 
 	router.
 		Path("/debug/pprof/profile").
-		HandlerFunc(pprof.Profile)
+		HandlerFunc(netpprof.Profile)
 
 	router.
 		Path("/debug/pprof/symbol").
-		HandlerFunc(pprof.Symbol)
+		HandlerFunc(netpprof.Symbol)
 
 	router.
 		Path("/debug/pprof/trace").
-		HandlerFunc(pprof.Trace)
+		HandlerFunc(netpprof.Trace)
+
+	// at last register the prefix
+	router.
+		PathPrefix("/debug/pprof/").
+		HandlerFunc(netpprof.Index)
 
 	return httpServer
 }
