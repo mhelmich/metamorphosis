@@ -30,6 +30,12 @@ message LogEntry {
   uint64 Offset = 1;
   bytes Key = 2;
   bytes Value = 3;
+  // This int enable metamorphosis to create a
+  // unique context to wait for in the commit replay.
+  // This way append can wait for changes to be committed.
+  uint64 Context = 4;
+  // Indicates whether this bool is an entry intent or not.
+  bool IsIntent = 5;
 }
 
 message MetamorphosisLog {
@@ -37,4 +43,7 @@ message MetamorphosisLog {
   map<string, bytes> state = 1;
   // this will contain all log entries with the map as base state
   repeated LogEntry log = 2;
+  // offsets are computed by the position of an intent in the log
+  // plus the base offset from previous compactions
+  uint64 baseOffset = 3;
 }

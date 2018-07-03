@@ -160,7 +160,12 @@ func (s *httpServer) appendLogEntry(w http.ResponseWriter, r *http.Request) {
 	value := make([]byte, 16)
 	rand.Read(key)
 	rand.Read(value)
-	offset := s.theLog.append(key, value)
+	offset, err := s.theLog.append(key, value)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
 	j, err := json.Marshal(offset)
 	if err != nil {
 		http.Error(w, err.Error(), 500)

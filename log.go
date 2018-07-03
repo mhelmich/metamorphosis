@@ -17,7 +17,6 @@
 package main
 
 import (
-	"bytes"
 	"container/list"
 	"fmt"
 	"sync"
@@ -33,13 +32,32 @@ import (
 // https://www.cockroachlabs.com/blog/how-cockroachdb-distributes-atomic-transactions/
 // https://www.cockroachlabs.com/blog/sql-in-cockroachdb-mapping-table-data-to-key-value-storage/
 
+// Log entries are appended to the existing log.
+// That happens in a two-step process:
+// 1. Write an intent to CopyCat (log entry consisting key, value, and the intent flag set - no offset).
+//    The rountine appending waits for the entry to be replayed.
+// 2. When the entry gets replayed, the position in the CopyCat log relative to the last
+//    committed entry will determine its offset. Upon computation of the offset,
+//    a rountine to write entry (inlcuding offset) to CopyCat is scheduled and the offset is returned.
+
 type log struct {
-	log         *list.List
-	mutex       *sync.RWMutex
-	offsetMutex *sync.Mutex
-	snapshot    *sync.Map
-	nextOffset  uint64
-	maxLogSize  int
+	// the log is just a linked list today
+	log *list.List
+	// this mutex guards the log and snapshot
+	mutex *sync.RWMutex
+	// contains the compacted log
+	// resembles map[string][]byte
+	snapshot *sync.Map
+	// these two switches define when compaction will happen
+	anticipatedLogLen                 int
+	highWatermarkLogSizeMultiplicator int
+	// poor mans future
+	// makes a routine wait for a commit entry to be replayed
+	contextWait *contextWait
+	// a log entry offset is determined by the position of its intent in the log
+	// the offset will be the number of all previous intents + 1
+	// this will be part of the copycat snapshot that is being created from time to time
+	baseOffset uint64
 
 	proposeCh        chan<- []byte
 	commitCh         <-chan []byte
@@ -49,11 +67,12 @@ type log struct {
 
 func newLog(dataStructureId string, cc copycat.CopyCat) (*log, error) {
 	l := &log{
-		log:         &list.List{},
-		mutex:       &sync.RWMutex{},
-		offsetMutex: &sync.Mutex{},
-		snapshot:    &sync.Map{},
-		maxLogSize:  1000,
+		log:                               &list.List{},
+		mutex:                             &sync.RWMutex{},
+		snapshot:                          &sync.Map{},
+		anticipatedLogLen:                 1000,
+		highWatermarkLogSizeMultiplicator: 3,
+		contextWait:                       newContextWait(),
 	}
 
 	var err error
@@ -106,9 +125,11 @@ func (l *log) serveChannels() {
 				}()
 
 				wg.Wait()
+				// set the internal state of the log
 				l.mutex.Lock()
 				l.log = newLog
 				l.snapshot = newSnap
+				l.baseOffset = protobuf.BaseOffset
 				l.mutex.Unlock()
 			} else {
 				le := &pb.LogEntry{}
@@ -118,9 +139,33 @@ func (l *log) serveChannels() {
 				}
 
 				l.mutex.Lock()
-				l.log.PushBack(le)
-				l.nextOffset = le.Offset + 1
+				if le.IsIntent {
+					// if the log entry is an intent, slap it at the back of the log
+					// its position will determine this log entries offset
+					l.log.PushBack(le)
+				} else {
+					// if the log entry is not an intent, find the position in the log,
+					// that's right for it
+					inserted := false
+					for e := l.log.Back(); e != nil; e = e.Prev() {
+						lle := e.Value.(*pb.LogEntry)
+						if !lle.IsIntent && lle.Offset < le.Offset {
+							l.log.InsertAfter(le, e)
+							inserted = true
+							break
+						}
+					}
+
+					// if I haven't put the log entry anywhere yet
+					// (because for example there are only intents left in the log)
+					// I will be progressive and push the log entry at the tail of the log
+					// this should make inserting new log entries fast
+					if !inserted {
+						l.log.PushBack(le)
+					}
+				}
 				l.mutex.Unlock()
+				l.contextWait.trigger(le.Context)
 			}
 
 			go l.maybeCompact()
@@ -129,19 +174,19 @@ func (l *log) serveChannels() {
 }
 
 func (l *log) maybeCompact() {
-	if l.log.Len() > l.maxLogSize {
+	// compact when the log is X times its anticipated size
+	if l.log.Len() > l.anticipatedLogLen*l.highWatermarkLogSizeMultiplicator {
 		l.mutex.Lock()
-		if l.log.Len() > l.maxLogSize {
-			var prevElement *list.Element
-			for e := l.log.Front(); e != nil && l.log.Len() > l.maxLogSize; e = e.Next() {
-				if prevElement != nil {
-					l.log.Remove(prevElement)
+		if l.log.Len() > l.anticipatedLogLen*l.highWatermarkLogSizeMultiplicator {
+			for e := l.log.Front(); e != nil && l.log.Len() > l.anticipatedLogLen; e = l.log.Front() {
+				le := e.Value.(*pb.LogEntry)
+				if le.IsIntent {
+					l.baseOffset++
+				} else {
+					l.snapshot.Store(string(le.Key), le.Value)
 				}
-				entry := e.Value.(*pb.LogEntry)
-				l.snapshot.Store(string(entry.Key), entry.Value)
-				prevElement = e
+				l.log.Remove(e)
 			}
-			l.log.Remove(prevElement)
 		}
 		l.mutex.Unlock()
 	}
@@ -157,6 +202,7 @@ func (l *log) snapshotProvider() ([]byte, error) {
 	log := make([]*pb.LogEntry, l.log.Len())
 	m := make(map[string][]byte)
 
+	// serialize the snapshot
 	go func() {
 		l.snapshot.Range(func(key interface{}, value interface{}) bool {
 			k := key.(string)
@@ -167,13 +213,18 @@ func (l *log) snapshotProvider() ([]byte, error) {
 		wg.Done()
 	}()
 
+	// serialize the log
 	go func() {
 		i := 0
 		for e := l.log.Front(); e != nil; e = e.Next() {
-			entry := e.Value.(*pb.LogEntry)
-			log[i] = entry
-			i++
+			le := e.Value.(*pb.LogEntry)
+			if !le.IsIntent {
+				log[i] = le
+				i++
+			}
 		}
+		// filtered all intents and shrink the slice down
+		log = log[:i]
 		wg.Done()
 	}()
 
@@ -184,31 +235,83 @@ func (l *log) snapshotProvider() ([]byte, error) {
 
 	select {
 	case <-done:
+		daLog := &pb.MetamorphosisLog{
+			State:      m,
+			Log:        log,
+			BaseOffset: l.baseOffset,
+		}
+		return daLog.Marshal()
 	case <-time.After(1 * time.Second):
+		return nil, fmt.Errorf("Snapshotting this log took longer than 1s")
 	}
-
-	daLog := &pb.MetamorphosisLog{
-		State: m,
-		Log:   log,
-	}
-	return daLog.Marshal()
 }
 
-func (l *log) append(key []byte, value []byte) uint64 {
-	l.offsetMutex.Lock()
-	entry := &pb.LogEntry{
-		Key:    key,
-		Value:  value,
-		Offset: l.nextOffset,
+func (l *log) append(key []byte, value []byte) (uint64, error) {
+	msgContext := randomContext()
+	le := &pb.LogEntry{
+		Key:      key,
+		Value:    value,
+		Context:  msgContext,
+		IsIntent: true,
+		// will be filled by the second iteration
+		// Offset: l.nextOffset,
 	}
-	bites, err := entry.Marshal()
+	bites, err := le.Marshal()
 	if err != nil {
-		logrus.Errorf("Can't marshal append: %s", err.Error())
+		return 0, err
+	}
+
+	wait := l.contextWait.register(msgContext)
+	l.proposeCh <- bites
+
+	select {
+	case <-wait:
+		// compute my offset
+		newOffset := l.computeNewOffset(msgContext)
+		// schedule writing the committed entry
+		l.writeCommittedEntry(key, value, newOffset)
+		// dash out to unblock the caller
+		return newOffset, nil
+	case <-time.After(3 * time.Second):
+		return 0, fmt.Errorf("Timed out waiting for append %d", msgContext)
+	}
+}
+
+func (l *log) computeNewOffset(msgContext uint64) uint64 {
+	var numIntents uint64
+	var e *list.Element
+
+	l.mutex.RLock()
+	// find my intent and count the number of intents along the way
+	for e = l.log.Front(); e != nil; e = e.Next() {
+		le := e.Value.(*pb.LogEntry)
+
+		if le.IsIntent {
+			numIntents++
+		}
+
+		if le.Context == msgContext {
+			break
+		}
+	}
+
+	l.mutex.RUnlock()
+	// the number of intents in the log before my intent is the offset
+	return l.baseOffset + numIntents
+}
+
+func (l *log) writeCommittedEntry(key []byte, value []byte, newOffset uint64) {
+	le := &pb.LogEntry{
+		Key:      key,
+		Value:    value,
+		IsIntent: false,
+		Offset:   newOffset,
+	}
+	bites, err := le.Marshal()
+	if err != nil {
+		logrus.Errorf("Can't serialize uncommitted log entry: %s", err.Error())
 	}
 	l.proposeCh <- bites
-	l.offsetMutex.Unlock()
-
-	return entry.Offset
 }
 
 func (l *log) readFromOffset(startingOffset uint64, maxBatchSize int) ([]*pb.LogEntry, error) {
@@ -226,40 +329,11 @@ func (l *log) readFromOffset(startingOffset uint64, maxBatchSize int) ([]*pb.Log
 	idx := 0
 	for e := head; e != nil && idx < maxBatchSize; e = e.Next() {
 		entry := e.Value.(*pb.LogEntry)
-		if entry.Offset >= startingOffset {
+		if entry.Offset >= startingOffset && !entry.IsIntent {
 			entries[idx] = entry
 			idx++
 		}
 	}
 
 	return entries[:idx], nil
-}
-
-func (l *log) readKey(key []byte, startingOffset uint64) *pb.LogEntry {
-	l.mutex.RLock()
-	defer l.mutex.RUnlock()
-
-	head := l.log.Front()
-	if head == nil {
-		return nil
-	}
-
-	headEntry := head.Value.(*pb.LogEntry)
-	if headEntry.Offset < startingOffset {
-		for e := head; e != nil; e = e.Next() {
-			entry := e.Value.(*pb.LogEntry)
-			if entry.Offset >= startingOffset && bytes.Compare(entry.Key, key) == 0 {
-				return entry
-			}
-		}
-	} else {
-		v, ok := l.snapshot.Load(key)
-		if !ok {
-			return nil
-		}
-
-		return v.(*pb.LogEntry)
-	}
-
-	return nil
 }
