@@ -21,23 +21,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
-	"io"
 	"net/http"
 	netpprof "net/http/pprof"
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/mhelmich/copycat"
 	"github.com/mhelmich/metamorphosis/pb"
-	"github.com/sirupsen/logrus"
 )
 
-func newHttpServer(port int, cc copycat.CopyCat) *httpServer {
-	l, err := newLog("01CFRDSD7PBQZXV8N515RVYTZQ", cc)
-	if err != nil {
-		logrus.Panicf("Can't create log: %s", err.Error())
-	}
+type httpServer struct {
+	http.Server
+	tm *topicManager
+}
 
+func startNewHttpServer(port int, tm *topicManager) (*httpServer, error) {
 	router := mux.NewRouter().StrictSlash(true)
 	httpServer := &httpServer{
 		Server: http.Server{
@@ -47,20 +44,19 @@ func newHttpServer(port int, cc copycat.CopyCat) *httpServer {
 			ReadTimeout:  time.Second * 60,
 			IdleTimeout:  time.Second * 60,
 		},
-		theLog: l,
-		cc:     cc,
+		tm: tm,
 	}
 
 	// set up routes
 	router.
 		Methods("GET").
-		Path("/inspectLog").
+		Path("/inspectLog/{topic}").
 		HandlerFunc(httpServer.inspectLog).
 		Name("inspectLog")
 
 	router.
 		Methods("GET").
-		Path("/appendLogEntry").
+		Path("/appendLogEntry/{topic}").
 		HandlerFunc(httpServer.appendLogEntry).
 		Name("appendLogEntry")
 
@@ -69,6 +65,14 @@ func newHttpServer(port int, cc copycat.CopyCat) *httpServer {
 		Path("/createTopic/{topic}").
 		HandlerFunc(httpServer.createTopic).
 		Name("createTopic")
+
+	router.
+		Path("/debug/metamorphosis/topics").
+		HandlerFunc(httpServer.debugTopicMetadata)
+
+	router.
+		Path("/debug/metamorphosis/metrics").
+		HandlerFunc(httpServer.metrics)
 
 	// drag in pprof endpoints
 	router.
@@ -88,17 +92,16 @@ func newHttpServer(port int, cc copycat.CopyCat) *httpServer {
 		HandlerFunc(netpprof.Trace)
 
 	// at last register the prefix
+	// NB: the trailing slash ("/") is a concession
+	// to how gorilla does routing
+	// when you want to go to the pprof page, you need to add
+	// the trailing slash to your URL
 	router.
 		PathPrefix("/debug/pprof/").
 		HandlerFunc(netpprof.Index)
 
-	return httpServer
-}
-
-type httpServer struct {
-	http.Server
-	cc     copycat.CopyCat
-	theLog *log
+	go httpServer.ListenAndServe()
+	return httpServer, nil
 }
 
 func (s *httpServer) createTopic(w http.ResponseWriter, r *http.Request) {
@@ -114,29 +117,30 @@ func (s *httpServer) createTopic(w http.ResponseWriter, r *http.Request) {
 	a[0] = len(bites)
 	a[1] = bites
 
-	j, err := json.Marshal(a)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	io.WriteString(w, string(j))
+	json.NewEncoder(w).Encode(a)
 }
 
 // naive implementation
 func (s *httpServer) inspectLog(w http.ResponseWriter, r *http.Request) {
-	bites, err := s.theLog.snapshotProvider()
+	vars := mux.Vars(r)
+	l, err := s.tm.getTopicForName(vars["topic"])
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	daLog := &pb.MetamorphosisLog{}
+	bites, err := l.snapshotProvider()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	daLog := &pb.LogSnapshot{}
 	err = daLog.Unmarshal(bites)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -144,35 +148,56 @@ func (s *httpServer) inspectLog(w http.ResponseWriter, r *http.Request) {
 	a[0] = daLog.State
 	a[1] = daLog.Log
 
-	j, err := json.Marshal(a)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	io.WriteString(w, string(j))
+	json.NewEncoder(w).Encode(a)
 }
 
 func (s *httpServer) appendLogEntry(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	l, err := s.tm.getTopicForName(vars["topic"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	key := make([]byte, 16)
 	value := make([]byte, 16)
 	rand.Read(key)
 	rand.Read(value)
-	offset, err := s.theLog.append(key, value)
+	offset, err := l.append(key, value)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
-	j, err := json.Marshal(offset)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-	io.WriteString(w, string(j))
+	json.NewEncoder(w).Encode(offset)
+}
+
+func (s *httpServer) debugTopicMetadata(w http.ResponseWriter, r *http.Request) {
+	// TODO - make this less inefficient
+	bites, err := s.tm.snapshotProvider()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	md := &pb.TopicMetadataSnapshot{}
+	err = md.Unmarshal(bites)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(md)
+}
+
+func (s *httpServer) metrics(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	writeMetricsAsJSON(w)
 }

@@ -20,10 +20,29 @@ import (
 	"crypto/rand"
 
 	"github.com/mhelmich/copycat"
-	"github.com/stretchr/testify/mock"
 )
 
 func newMockCopyCat() copycat.CopyCat {
+	return &fakeCopyCat{}
+}
+
+func newRandomCopyCatId() *copycat.ID {
+	var id copycat.ID
+	rand.Reader.Read(id[:])
+	return &id
+}
+
+type fakeCopyCat struct{}
+
+func (cc *fakeCopyCat) NewDataStructureID() (*copycat.ID, error) {
+	return newRandomCopyCatId(), nil
+}
+
+func (cc *fakeCopyCat) AllocateNewDataStructure(opts ...copycat.AllocationOption) (*copycat.ID, error) {
+	return cc.NewDataStructureID()
+}
+
+func (cc *fakeCopyCat) SubscribeToDataStructureWithStringID(id string, provider copycat.SnapshotProvider) (chan<- []byte, <-chan []byte, <-chan error, copycat.SnapshotConsumer, error) {
 	proposeCh := make(chan []byte)
 	commitCh := make(chan []byte)
 	go func() {
@@ -35,19 +54,11 @@ func newMockCopyCat() copycat.CopyCat {
 			commitCh <- bites
 		}
 	}()
-
-	var returnedProposeCh chan<- []byte = proposeCh
-	var returnedCommitCh <-chan []byte = commitCh
-
-	mockCat := new(mockCopyCat)
-	mockCat.On("AllocateNewDataStructure", mock.Anything).Return(newRandomId(), nil)
-	mockCat.On("SubscribeToDataStructureWithStringID", mock.Anything, mock.Anything).Return(returnedProposeCh, returnedCommitCh, nil, nil, nil)
-	mockCat.On("Shutdown").Return()
-	return mockCat
+	return proposeCh, commitCh, nil, nil, nil
 }
 
-func newRandomId() *copycat.ID {
-	var id copycat.ID
-	rand.Reader.Read(id[:])
-	return &id
+func (cc *fakeCopyCat) SubscribeToDataStructure(id *copycat.ID, provider copycat.SnapshotProvider) (chan<- []byte, <-chan []byte, <-chan error, copycat.SnapshotConsumer, error) {
+	return nil, nil, nil, nil, nil
 }
+
+func (cc *fakeCopyCat) Shutdown() {}

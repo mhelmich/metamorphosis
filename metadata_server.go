@@ -17,43 +17,21 @@
 package main
 
 import (
-	"sync"
+	"context"
 
-	"github.com/sirupsen/logrus"
+	"github.com/mhelmich/metamorphosis/pb"
 )
 
-func newContextWait() *contextWait {
-	return &contextWait{
-		m:    make(map[uint64]chan interface{}),
-		lock: &sync.Mutex{},
-	}
+func newMetadataServer() *metadataServer {
+	return &metadataServer{}
 }
 
-type contextWait struct {
-	m    map[uint64]chan interface{}
-	lock *sync.Mutex
+type metadataServer struct{}
+
+func (ms *metadataServer) CreateTopic(context.Context, *pb.CreateTopicRequest) (*pb.CreateTopicResponse, error) {
+	return nil, nil
 }
 
-func (w *contextWait) register(id uint64) <-chan interface{} {
-	w.lock.Lock()
-	_, ok := w.m[id]
-	if ok {
-		logrus.Panic("dup waiter id")
-	}
-
-	ch := make(chan interface{})
-	w.m[id] = ch
-	w.lock.Unlock()
-	return ch
-}
-
-func (w *contextWait) trigger(id uint64, value interface{}) {
-	w.lock.Lock()
-	ch, ok := w.m[id]
-	if ok {
-		delete(w.m, id)
-		ch <- value
-		close(ch)
-	}
-	w.lock.Unlock()
+func (ms *metadataServer) ListTopics(context.Context, *pb.ListTopicsRequest) (*pb.ListTopicsResponse, error) {
+	return nil, nil
 }

@@ -67,6 +67,6 @@ RUN [ ! -e /etc/nsswitch.conf ] && echo 'hosts: files dns' > /etc/nsswitch.conf 
 USER ${METAMORPHOSIS_USER}
 
 # expose all ports out of the default config file
-EXPOSE 8080 8081 15000 15100
+EXPOSE 8080 8081 16000 16001
 # set our entry point on alpines shell
 ENTRYPOINT ["/bin/sh", "-c", "/metamorphosis/metamorphosis -config /metamorphosis/default_config.yaml"]

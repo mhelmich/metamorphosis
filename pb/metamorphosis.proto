@@ -34,16 +34,27 @@ message LogEntry {
   // unique context to wait for in the commit replay.
   // This way append can wait for changes to be committed.
   uint64 Context = 4;
-  // Indicates whether this bool is an entry intent or not.
-  bool IsIntent = 5;
 }
 
-message MetamorphosisLog {
+message LogSnapshot {
   // this map will contain keys and values from the log in compacted form
-  map<string, bytes> state = 1;
+  SnapState State = 1;
   // this will contain all log entries with the map as base state
-  repeated LogEntry log = 2;
+  repeated LogEntry Log = 2;
   // offsets are computed by the position of an intent in the log
   // plus the base offset from previous compactions
-  uint64 baseOffset = 3;
+  uint64 BaseOffset = 3;
+
+  message SnapState {
+    map<string, bytes> M = 1;
+  }
+}
+
+message TopicMetadataSnapshot {
+  map<string, string> TopicNameToDataStructureId = 1;
+}
+
+message TopicMetadataOperation {
+  string Name = 1;
+  string DataStructureId = 2;
 }

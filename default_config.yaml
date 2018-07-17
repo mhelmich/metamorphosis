@@ -19,9 +19,10 @@
 
 http-port: 8080
 grpc-port: 8081
-copycat-port: 15000
-gossip-port: 15100
-copycat-dir: "./metamorphosis.db/"
+copycat-port: 16000
+gossip-port: 16001
+# copycat-dir: "./copycat.db/"
+data-dir: "./metamorphosis.db/"
 
 # No peers defined!
 # The come in via a ENV variable

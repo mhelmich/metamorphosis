@@ -16,6 +16,7 @@
 
 copycat-port: 12000
 gossip-port: 12100
-copycat-dir: "./metamorphosis.db1/"
+# copycat-dir: "./metamorphosis.db1/"
+data-dir: "./metamorphosis.db1/"
 http-port: 12200
 grpc-port: 12300

@@ -16,7 +16,9 @@
 
 package main
 
-import "sync"
+import (
+	"sync"
+)
 
 func sizeOfMap(m *sync.Map) int {
 	var i int

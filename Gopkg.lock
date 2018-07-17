@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  branch = "master"
+  name = "github.com/AndreasBriese/bbloom"
+  packages = ["."]
+  revision = "28f7e881ca57bc00e028f9ede9f0d9104cfeef5e"
+
+[[projects]]
   name = "github.com/armon/go-metrics"
   packages = ["."]
   revision = "3df31a1ada83e310c2e24b267c8e8b68836547b4"
@@ -26,6 +32,25 @@
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
+
+[[projects]]
+  name = "github.com/dgraph-io/badger"
+  packages = [
+    ".",
+    "options",
+    "protos",
+    "skl",
+    "table",
+    "y"
+  ]
+  revision = "391b6d3b93e6014fe8c2971fcc0c1266e47dbbd9"
+  version = "v1.5.3"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/dgryski/go-farm"
+  packages = ["."]
+  revision = "2de33835d10275975374b37b2dcfd22c9020a1f5"
 
 [[projects]]
   name = "github.com/fsnotify/fsnotify"
@@ -129,7 +154,7 @@
     ".",
     "pb"
   ]
-  revision = "0ce1c907ea562d3872ba303dbfbd6303da92f0cb"
+  revision = "d41970f4b8947507f82038f10735453422f0639e"
 
 [[projects]]
   name = "github.com/miekg/dns"
@@ -150,10 +175,22 @@
   version = "v1.2.0"
 
 [[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
   version = "v1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/rcrowley/go-metrics"
+  packages = ["."]
+  revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
@@ -321,6 +358,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "01c45c3466d9ed0c7cd4124ac208a8f359d84a5fda1bda900cb2abd81f5f0da4"
+  inputs-digest = "3e45e2eab00f0fbef1b28c662a9f9f134f953086dabe772a58b2f8ebcf54d8fe"
   solver-name = "gps-cdcl"
   solver-version = 1

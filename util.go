@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"os"
 
 	"github.com/sirupsen/logrus"
 )
@@ -28,6 +29,13 @@ func bytesToUint64(b []byte) uint64 {
 	return binary.BigEndian.Uint64(b)
 }
 
+// converts a uint64 to a byte slice
+func uint64ToBytes(u uint64) []byte {
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, u)
+	return buf
+}
+
 func randomContext() uint64 {
 	bites := make([]byte, 8)
 	_, err := rand.Read(bites)
@@ -35,4 +43,21 @@ func randomContext() uint64 {
 		logrus.Panicf("Can't read from random: %s", err.Error())
 	}
 	return bytesToUint64(bites)
+}
+
+func createDirIfNotExists(dir string) error {
+	if !dirExists(dir) {
+		return os.MkdirAll(dir, os.ModePerm)
+	}
+	return nil
+}
+
+func dirExists(dir string) bool {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return false
+	} else if err != nil {
+		return false
+	}
+
+	return true
 }

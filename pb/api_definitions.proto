@@ -26,37 +26,38 @@ option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_getters_all) = false;
 option (gogoproto.goproto_enum_prefix_all) = false;
 
-service MetamorphosisService {
-  rpc Put(PutRequest) returns (PutResponse) {}
-  rpc Get(GetRequest) returns (GetResponse) {}
-  rpc List(ListRequest) returns (ListResponse) {}
+// Metadata service definition for metamorphosis.
+// This service bundles all administrative endpoints necessary to run metamorphosis.
+service MetamorphosisMetadataService {
+  // Creates a topic with the given name.
+  // Returns an error if the topic already exists.
+  rpc CreateTopic(CreateTopicRequest) returns (CreateTopicResponse) {}
+  rpc ListTopics(ListTopicsRequest) returns (ListTopicsResponse) {}
 }
 
-message PutRequest {
-  string Key = 1;
-  string Value = 2;
+message CreateTopicRequest {
+  string TopicName = 1;
 }
 
-message PutResponse {
+message CreateTopicResponse {
+  bool Ok = 1;
 }
 
-message GetRequest {
-  string Key = 1;
+message ListTopicsRequest {
+  string NamePrefix = 1;
 }
 
-message GetResponse {
-  string Value = 1;
+message ListTopicsResponse {
+  repeated TopicMetadata metadata = 1;
 }
 
-message ListRequest {
-}
-
-message ListResponse {
-  map<string, string> m = 1;
+message TopicMetadata {
+  string Name = 1;
+  uint64 Size = 2;
 }
 
  // Incredibly simple pub-sub service definition.
-service PubSubService {
+service MetamorphosisPubSubService {
   rpc Publish(stream PublishRequest) returns (stream PublishResponse) {}
   rpc Subscribe(stream SubscribeRequest) returns (stream SubscribeResponse) {}
 }
@@ -66,10 +67,10 @@ service PubSubService {
 // Failure to do so will fail the session.
 // From then on the provided entry will be appended to the log.
 // Setting the topic field to a different value will have no effect (the value
-// of the field will be ignored from then on).
+// of the field will be ignored after the first request for the duration of the session).
 // In order to publish to a different topic the stream needs to be closed and
 // a new stream needs to be created.
-// When a topic is provided that doesn't exist, a topic with this name will be created.
+// When a topic is provided that doesn't exist, an error will be returned.
 message PublishRequest {
   string Topic = 1;
   bytes EntryKey = 2;
@@ -79,7 +80,9 @@ message PublishRequest {
 // For each publish request a corresponding response will be sent.
 // The response will contain the entry key that has been committed by metamorphosis.
 message PublishResponse {
-  bytes CommittedEntryKey = 1;
+  string Error = 1;
+  bytes CommittedEntryKey = 2;
+  uint64 Offset = 3;
 }
 
 
@@ -94,11 +97,13 @@ message PublishResponse {
 // Failure to provide a reasonable combination of starting entry and committed entry will result in a failure and close of the session.
 message SubscribeRequest {
   string Topic = 1;
-  bytes StartingEntryKey = 2;
+  uint64 StartingOffset = 2;
   bytes CommittedEntryKey = 3;
 }
 
 message SubscribeResponse {
-  bytes EntryKey = 1;
-  bytes EntryData = 2;
+  string Error = 1;
+  uint64 StartingOffset = 2;
+  repeated bytes EntryKeys = 3;
+  repeated bytes EntryValues = 4;
 }

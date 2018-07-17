@@ -9,18 +9,19 @@
 		pb/metamorphosis.proto
 
 	It has these top-level messages:
-		PutRequest
-		PutResponse
-		GetRequest
-		GetResponse
-		ListRequest
-		ListResponse
+		CreateTopicRequest
+		CreateTopicResponse
+		ListTopicsRequest
+		ListTopicsResponse
+		TopicMetadata
 		PublishRequest
 		PublishResponse
 		SubscribeRequest
 		SubscribeResponse
 		LogEntry
-		MetamorphosisLog
+		LogSnapshot
+		TopicMetadataSnapshot
+		TopicMetadataOperation
 */
 package pb
 
@@ -45,68 +46,63 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
-type PutRequest struct {
-	Key   string `protobuf:"bytes,1,opt,name=Key,proto3" json:"Key,omitempty"`
-	Value string `protobuf:"bytes,2,opt,name=Value,proto3" json:"Value,omitempty"`
+type CreateTopicRequest struct {
+	TopicName string `protobuf:"bytes,1,opt,name=TopicName,proto3" json:"TopicName,omitempty"`
 }
 
-func (m *PutRequest) Reset()                    { *m = PutRequest{} }
-func (m *PutRequest) String() string            { return proto.CompactTextString(m) }
-func (*PutRequest) ProtoMessage()               {}
-func (*PutRequest) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{0} }
+func (m *CreateTopicRequest) Reset()                    { *m = CreateTopicRequest{} }
+func (m *CreateTopicRequest) String() string            { return proto.CompactTextString(m) }
+func (*CreateTopicRequest) ProtoMessage()               {}
+func (*CreateTopicRequest) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{0} }
 
-type PutResponse struct {
+type CreateTopicResponse struct {
+	Ok bool `protobuf:"varint,1,opt,name=Ok,proto3" json:"Ok,omitempty"`
 }
 
-func (m *PutResponse) Reset()                    { *m = PutResponse{} }
-func (m *PutResponse) String() string            { return proto.CompactTextString(m) }
-func (*PutResponse) ProtoMessage()               {}
-func (*PutResponse) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{1} }
-
-type GetRequest struct {
-	Key string `protobuf:"bytes,1,opt,name=Key,proto3" json:"Key,omitempty"`
+func (m *CreateTopicResponse) Reset()         { *m = CreateTopicResponse{} }
+func (m *CreateTopicResponse) String() string { return proto.CompactTextString(m) }
+func (*CreateTopicResponse) ProtoMessage()    {}
+func (*CreateTopicResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptorApiDefinitions, []int{1}
 }
 
-func (m *GetRequest) Reset()                    { *m = GetRequest{} }
-func (m *GetRequest) String() string            { return proto.CompactTextString(m) }
-func (*GetRequest) ProtoMessage()               {}
-func (*GetRequest) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{2} }
-
-type GetResponse struct {
-	Value string `protobuf:"bytes,1,opt,name=Value,proto3" json:"Value,omitempty"`
+type ListTopicsRequest struct {
+	NamePrefix string `protobuf:"bytes,1,opt,name=NamePrefix,proto3" json:"NamePrefix,omitempty"`
 }
 
-func (m *GetResponse) Reset()                    { *m = GetResponse{} }
-func (m *GetResponse) String() string            { return proto.CompactTextString(m) }
-func (*GetResponse) ProtoMessage()               {}
-func (*GetResponse) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{3} }
+func (m *ListTopicsRequest) Reset()                    { *m = ListTopicsRequest{} }
+func (m *ListTopicsRequest) String() string            { return proto.CompactTextString(m) }
+func (*ListTopicsRequest) ProtoMessage()               {}
+func (*ListTopicsRequest) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{2} }
 
-type ListRequest struct {
+type ListTopicsResponse struct {
+	Metadata []*TopicMetadata `protobuf:"bytes,1,rep,name=metadata" json:"metadata,omitempty"`
 }
 
-func (m *ListRequest) Reset()                    { *m = ListRequest{} }
-func (m *ListRequest) String() string            { return proto.CompactTextString(m) }
-func (*ListRequest) ProtoMessage()               {}
-func (*ListRequest) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{4} }
+func (m *ListTopicsResponse) Reset()                    { *m = ListTopicsResponse{} }
+func (m *ListTopicsResponse) String() string            { return proto.CompactTextString(m) }
+func (*ListTopicsResponse) ProtoMessage()               {}
+func (*ListTopicsResponse) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{3} }
 
-type ListResponse struct {
-	M map[string]string `protobuf:"bytes,1,rep,name=m" json:"m,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+type TopicMetadata struct {
+	Name  string `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
+	Size_ uint64 `protobuf:"varint,2,opt,name=Size,proto3" json:"Size,omitempty"`
 }
 
-func (m *ListResponse) Reset()                    { *m = ListResponse{} }
-func (m *ListResponse) String() string            { return proto.CompactTextString(m) }
-func (*ListResponse) ProtoMessage()               {}
-func (*ListResponse) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{5} }
+func (m *TopicMetadata) Reset()                    { *m = TopicMetadata{} }
+func (m *TopicMetadata) String() string            { return proto.CompactTextString(m) }
+func (*TopicMetadata) ProtoMessage()               {}
+func (*TopicMetadata) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{4} }
 
 // Sending a publish request starts a new publisher session on metamorphosis.
 // The first request in the stream requires the topic field to be set.
 // Failure to do so will fail the session.
 // From then on the provided entry will be appended to the log.
 // Setting the topic field to a different value will have no effect (the value
-// of the field will be ignored from then on).
+// of the field will be ignored after the first request for the duration of the session).
 // In order to publish to a different topic the stream needs to be closed and
 // a new stream needs to be created.
-// When a topic is provided that doesn't exist, a topic with this name will be created.
+// When a topic is provided that doesn't exist, an error will be returned.
 type PublishRequest struct {
 	Topic     string `protobuf:"bytes,1,opt,name=Topic,proto3" json:"Topic,omitempty"`
 	EntryKey  []byte `protobuf:"bytes,2,opt,name=EntryKey,proto3" json:"EntryKey,omitempty"`
@@ -116,18 +112,20 @@ type PublishRequest struct {
 func (m *PublishRequest) Reset()                    { *m = PublishRequest{} }
 func (m *PublishRequest) String() string            { return proto.CompactTextString(m) }
 func (*PublishRequest) ProtoMessage()               {}
-func (*PublishRequest) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{6} }
+func (*PublishRequest) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{5} }
 
 // For each publish request a corresponding response will be sent.
 // The response will contain the entry key that has been committed by metamorphosis.
 type PublishResponse struct {
-	CommittedEntryKey []byte `protobuf:"bytes,1,opt,name=CommittedEntryKey,proto3" json:"CommittedEntryKey,omitempty"`
+	Error             string `protobuf:"bytes,1,opt,name=Error,proto3" json:"Error,omitempty"`
+	CommittedEntryKey []byte `protobuf:"bytes,2,opt,name=CommittedEntryKey,proto3" json:"CommittedEntryKey,omitempty"`
+	Offset            uint64 `protobuf:"varint,3,opt,name=Offset,proto3" json:"Offset,omitempty"`
 }
 
 func (m *PublishResponse) Reset()                    { *m = PublishResponse{} }
 func (m *PublishResponse) String() string            { return proto.CompactTextString(m) }
 func (*PublishResponse) ProtoMessage()               {}
-func (*PublishResponse) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{7} }
+func (*PublishResponse) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{6} }
 
 // Sending a subcribe request starts a new subscription session on metamorphosis.
 // The first request in the stream requires the topic and starting entry key fields to be set.
@@ -140,32 +138,33 @@ func (*PublishResponse) Descriptor() ([]byte, []int) { return fileDescriptorApiD
 // Failure to provide a reasonable combination of starting entry and committed entry will result in a failure and close of the session.
 type SubscribeRequest struct {
 	Topic             string `protobuf:"bytes,1,opt,name=Topic,proto3" json:"Topic,omitempty"`
-	StartingEntryKey  []byte `protobuf:"bytes,2,opt,name=StartingEntryKey,proto3" json:"StartingEntryKey,omitempty"`
+	StartingOffset    uint64 `protobuf:"varint,2,opt,name=StartingOffset,proto3" json:"StartingOffset,omitempty"`
 	CommittedEntryKey []byte `protobuf:"bytes,3,opt,name=CommittedEntryKey,proto3" json:"CommittedEntryKey,omitempty"`
 }
 
 func (m *SubscribeRequest) Reset()                    { *m = SubscribeRequest{} }
 func (m *SubscribeRequest) String() string            { return proto.CompactTextString(m) }
 func (*SubscribeRequest) ProtoMessage()               {}
-func (*SubscribeRequest) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{8} }
+func (*SubscribeRequest) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{7} }
 
 type SubscribeResponse struct {
-	EntryKey  []byte `protobuf:"bytes,1,opt,name=EntryKey,proto3" json:"EntryKey,omitempty"`
-	EntryData []byte `protobuf:"bytes,2,opt,name=EntryData,proto3" json:"EntryData,omitempty"`
+	Error          string   `protobuf:"bytes,1,opt,name=Error,proto3" json:"Error,omitempty"`
+	StartingOffset uint64   `protobuf:"varint,2,opt,name=StartingOffset,proto3" json:"StartingOffset,omitempty"`
+	EntryKeys      [][]byte `protobuf:"bytes,3,rep,name=EntryKeys" json:"EntryKeys,omitempty"`
+	EntryValues    [][]byte `protobuf:"bytes,4,rep,name=EntryValues" json:"EntryValues,omitempty"`
 }
 
 func (m *SubscribeResponse) Reset()                    { *m = SubscribeResponse{} }
 func (m *SubscribeResponse) String() string            { return proto.CompactTextString(m) }
 func (*SubscribeResponse) ProtoMessage()               {}
-func (*SubscribeResponse) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{9} }
+func (*SubscribeResponse) Descriptor() ([]byte, []int) { return fileDescriptorApiDefinitions, []int{8} }
 
 func init() {
-	proto.RegisterType((*PutRequest)(nil), "pb.PutRequest")
-	proto.RegisterType((*PutResponse)(nil), "pb.PutResponse")
-	proto.RegisterType((*GetRequest)(nil), "pb.GetRequest")
-	proto.RegisterType((*GetResponse)(nil), "pb.GetResponse")
-	proto.RegisterType((*ListRequest)(nil), "pb.ListRequest")
-	proto.RegisterType((*ListResponse)(nil), "pb.ListResponse")
+	proto.RegisterType((*CreateTopicRequest)(nil), "pb.CreateTopicRequest")
+	proto.RegisterType((*CreateTopicResponse)(nil), "pb.CreateTopicResponse")
+	proto.RegisterType((*ListTopicsRequest)(nil), "pb.ListTopicsRequest")
+	proto.RegisterType((*ListTopicsResponse)(nil), "pb.ListTopicsResponse")
+	proto.RegisterType((*TopicMetadata)(nil), "pb.TopicMetadata")
 	proto.RegisterType((*PublishRequest)(nil), "pb.PublishRequest")
 	proto.RegisterType((*PublishResponse)(nil), "pb.PublishResponse")
 	proto.RegisterType((*SubscribeRequest)(nil), "pb.SubscribeRequest")
@@ -180,175 +179,146 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// Client API for MetamorphosisService service
+// Client API for MetamorphosisMetadataService service
 
-type MetamorphosisServiceClient interface {
-	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*PutResponse, error)
-	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
-	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
+type MetamorphosisMetadataServiceClient interface {
+	// Creates a topic with the given name.
+	// Returns an error if the topic already exists.
+	CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error)
+	ListTopics(ctx context.Context, in *ListTopicsRequest, opts ...grpc.CallOption) (*ListTopicsResponse, error)
 }
 
-type metamorphosisServiceClient struct {
+type metamorphosisMetadataServiceClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewMetamorphosisServiceClient(cc *grpc.ClientConn) MetamorphosisServiceClient {
-	return &metamorphosisServiceClient{cc}
+func NewMetamorphosisMetadataServiceClient(cc *grpc.ClientConn) MetamorphosisMetadataServiceClient {
+	return &metamorphosisMetadataServiceClient{cc}
 }
 
-func (c *metamorphosisServiceClient) Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*PutResponse, error) {
-	out := new(PutResponse)
-	err := grpc.Invoke(ctx, "/pb.MetamorphosisService/Put", in, out, c.cc, opts...)
+func (c *metamorphosisMetadataServiceClient) CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error) {
+	out := new(CreateTopicResponse)
+	err := grpc.Invoke(ctx, "/pb.MetamorphosisMetadataService/CreateTopic", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *metamorphosisServiceClient) Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error) {
-	out := new(GetResponse)
-	err := grpc.Invoke(ctx, "/pb.MetamorphosisService/Get", in, out, c.cc, opts...)
+func (c *metamorphosisMetadataServiceClient) ListTopics(ctx context.Context, in *ListTopicsRequest, opts ...grpc.CallOption) (*ListTopicsResponse, error) {
+	out := new(ListTopicsResponse)
+	err := grpc.Invoke(ctx, "/pb.MetamorphosisMetadataService/ListTopics", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *metamorphosisServiceClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error) {
-	out := new(ListResponse)
-	err := grpc.Invoke(ctx, "/pb.MetamorphosisService/List", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
+// Server API for MetamorphosisMetadataService service
+
+type MetamorphosisMetadataServiceServer interface {
+	// Creates a topic with the given name.
+	// Returns an error if the topic already exists.
+	CreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error)
+	ListTopics(context.Context, *ListTopicsRequest) (*ListTopicsResponse, error)
 }
 
-// Server API for MetamorphosisService service
-
-type MetamorphosisServiceServer interface {
-	Put(context.Context, *PutRequest) (*PutResponse, error)
-	Get(context.Context, *GetRequest) (*GetResponse, error)
-	List(context.Context, *ListRequest) (*ListResponse, error)
+func RegisterMetamorphosisMetadataServiceServer(s *grpc.Server, srv MetamorphosisMetadataServiceServer) {
+	s.RegisterService(&_MetamorphosisMetadataService_serviceDesc, srv)
 }
 
-func RegisterMetamorphosisServiceServer(s *grpc.Server, srv MetamorphosisServiceServer) {
-	s.RegisterService(&_MetamorphosisService_serviceDesc, srv)
-}
-
-func _MetamorphosisService_Put_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PutRequest)
+func _MetamorphosisMetadataService_CreateTopic_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateTopicRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MetamorphosisServiceServer).Put(ctx, in)
+		return srv.(MetamorphosisMetadataServiceServer).CreateTopic(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/pb.MetamorphosisService/Put",
+		FullMethod: "/pb.MetamorphosisMetadataService/CreateTopic",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MetamorphosisServiceServer).Put(ctx, req.(*PutRequest))
+		return srv.(MetamorphosisMetadataServiceServer).CreateTopic(ctx, req.(*CreateTopicRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MetamorphosisService_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetRequest)
+func _MetamorphosisMetadataService_ListTopics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTopicsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(MetamorphosisServiceServer).Get(ctx, in)
+		return srv.(MetamorphosisMetadataServiceServer).ListTopics(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/pb.MetamorphosisService/Get",
+		FullMethod: "/pb.MetamorphosisMetadataService/ListTopics",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MetamorphosisServiceServer).Get(ctx, req.(*GetRequest))
+		return srv.(MetamorphosisMetadataServiceServer).ListTopics(ctx, req.(*ListTopicsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MetamorphosisService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MetamorphosisServiceServer).List(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pb.MetamorphosisService/List",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MetamorphosisServiceServer).List(ctx, req.(*ListRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-var _MetamorphosisService_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "pb.MetamorphosisService",
-	HandlerType: (*MetamorphosisServiceServer)(nil),
+var _MetamorphosisMetadataService_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "pb.MetamorphosisMetadataService",
+	HandlerType: (*MetamorphosisMetadataServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Put",
-			Handler:    _MetamorphosisService_Put_Handler,
+			MethodName: "CreateTopic",
+			Handler:    _MetamorphosisMetadataService_CreateTopic_Handler,
 		},
 		{
-			MethodName: "Get",
-			Handler:    _MetamorphosisService_Get_Handler,
-		},
-		{
-			MethodName: "List",
-			Handler:    _MetamorphosisService_List_Handler,
+			MethodName: "ListTopics",
+			Handler:    _MetamorphosisMetadataService_ListTopics_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "pb/api_definitions.proto",
 }
 
-// Client API for PubSubService service
+// Client API for MetamorphosisPubSubService service
 
-type PubSubServiceClient interface {
-	Publish(ctx context.Context, opts ...grpc.CallOption) (PubSubService_PublishClient, error)
-	Subscribe(ctx context.Context, opts ...grpc.CallOption) (PubSubService_SubscribeClient, error)
+type MetamorphosisPubSubServiceClient interface {
+	Publish(ctx context.Context, opts ...grpc.CallOption) (MetamorphosisPubSubService_PublishClient, error)
+	Subscribe(ctx context.Context, opts ...grpc.CallOption) (MetamorphosisPubSubService_SubscribeClient, error)
 }
 
-type pubSubServiceClient struct {
+type metamorphosisPubSubServiceClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewPubSubServiceClient(cc *grpc.ClientConn) PubSubServiceClient {
-	return &pubSubServiceClient{cc}
+func NewMetamorphosisPubSubServiceClient(cc *grpc.ClientConn) MetamorphosisPubSubServiceClient {
+	return &metamorphosisPubSubServiceClient{cc}
 }
 
-func (c *pubSubServiceClient) Publish(ctx context.Context, opts ...grpc.CallOption) (PubSubService_PublishClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PubSubService_serviceDesc.Streams[0], c.cc, "/pb.PubSubService/Publish", opts...)
+func (c *metamorphosisPubSubServiceClient) Publish(ctx context.Context, opts ...grpc.CallOption) (MetamorphosisPubSubService_PublishClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_MetamorphosisPubSubService_serviceDesc.Streams[0], c.cc, "/pb.MetamorphosisPubSubService/Publish", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &pubSubServicePublishClient{stream}
+	x := &metamorphosisPubSubServicePublishClient{stream}
 	return x, nil
 }
 
-type PubSubService_PublishClient interface {
+type MetamorphosisPubSubService_PublishClient interface {
 	Send(*PublishRequest) error
 	Recv() (*PublishResponse, error)
 	grpc.ClientStream
 }
 
-type pubSubServicePublishClient struct {
+type metamorphosisPubSubServicePublishClient struct {
 	grpc.ClientStream
 }
 
-func (x *pubSubServicePublishClient) Send(m *PublishRequest) error {
+func (x *metamorphosisPubSubServicePublishClient) Send(m *PublishRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *pubSubServicePublishClient) Recv() (*PublishResponse, error) {
+func (x *metamorphosisPubSubServicePublishClient) Recv() (*PublishResponse, error) {
 	m := new(PublishResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -356,30 +326,30 @@ func (x *pubSubServicePublishClient) Recv() (*PublishResponse, error) {
 	return m, nil
 }
 
-func (c *pubSubServiceClient) Subscribe(ctx context.Context, opts ...grpc.CallOption) (PubSubService_SubscribeClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_PubSubService_serviceDesc.Streams[1], c.cc, "/pb.PubSubService/Subscribe", opts...)
+func (c *metamorphosisPubSubServiceClient) Subscribe(ctx context.Context, opts ...grpc.CallOption) (MetamorphosisPubSubService_SubscribeClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_MetamorphosisPubSubService_serviceDesc.Streams[1], c.cc, "/pb.MetamorphosisPubSubService/Subscribe", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &pubSubServiceSubscribeClient{stream}
+	x := &metamorphosisPubSubServiceSubscribeClient{stream}
 	return x, nil
 }
 
-type PubSubService_SubscribeClient interface {
+type MetamorphosisPubSubService_SubscribeClient interface {
 	Send(*SubscribeRequest) error
 	Recv() (*SubscribeResponse, error)
 	grpc.ClientStream
 }
 
-type pubSubServiceSubscribeClient struct {
+type metamorphosisPubSubServiceSubscribeClient struct {
 	grpc.ClientStream
 }
 
-func (x *pubSubServiceSubscribeClient) Send(m *SubscribeRequest) error {
+func (x *metamorphosisPubSubServiceSubscribeClient) Send(m *SubscribeRequest) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *pubSubServiceSubscribeClient) Recv() (*SubscribeResponse, error) {
+func (x *metamorphosisPubSubServiceSubscribeClient) Recv() (*SubscribeResponse, error) {
 	m := new(SubscribeResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -387,36 +357,36 @@ func (x *pubSubServiceSubscribeClient) Recv() (*SubscribeResponse, error) {
 	return m, nil
 }
 
-// Server API for PubSubService service
+// Server API for MetamorphosisPubSubService service
 
-type PubSubServiceServer interface {
-	Publish(PubSubService_PublishServer) error
-	Subscribe(PubSubService_SubscribeServer) error
+type MetamorphosisPubSubServiceServer interface {
+	Publish(MetamorphosisPubSubService_PublishServer) error
+	Subscribe(MetamorphosisPubSubService_SubscribeServer) error
 }
 
-func RegisterPubSubServiceServer(s *grpc.Server, srv PubSubServiceServer) {
-	s.RegisterService(&_PubSubService_serviceDesc, srv)
+func RegisterMetamorphosisPubSubServiceServer(s *grpc.Server, srv MetamorphosisPubSubServiceServer) {
+	s.RegisterService(&_MetamorphosisPubSubService_serviceDesc, srv)
 }
 
-func _PubSubService_Publish_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(PubSubServiceServer).Publish(&pubSubServicePublishServer{stream})
+func _MetamorphosisPubSubService_Publish_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MetamorphosisPubSubServiceServer).Publish(&metamorphosisPubSubServicePublishServer{stream})
 }
 
-type PubSubService_PublishServer interface {
+type MetamorphosisPubSubService_PublishServer interface {
 	Send(*PublishResponse) error
 	Recv() (*PublishRequest, error)
 	grpc.ServerStream
 }
 
-type pubSubServicePublishServer struct {
+type metamorphosisPubSubServicePublishServer struct {
 	grpc.ServerStream
 }
 
-func (x *pubSubServicePublishServer) Send(m *PublishResponse) error {
+func (x *metamorphosisPubSubServicePublishServer) Send(m *PublishResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *pubSubServicePublishServer) Recv() (*PublishRequest, error) {
+func (x *metamorphosisPubSubServicePublishServer) Recv() (*PublishRequest, error) {
 	m := new(PublishRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -424,25 +394,25 @@ func (x *pubSubServicePublishServer) Recv() (*PublishRequest, error) {
 	return m, nil
 }
 
-func _PubSubService_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(PubSubServiceServer).Subscribe(&pubSubServiceSubscribeServer{stream})
+func _MetamorphosisPubSubService_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MetamorphosisPubSubServiceServer).Subscribe(&metamorphosisPubSubServiceSubscribeServer{stream})
 }
 
-type PubSubService_SubscribeServer interface {
+type MetamorphosisPubSubService_SubscribeServer interface {
 	Send(*SubscribeResponse) error
 	Recv() (*SubscribeRequest, error)
 	grpc.ServerStream
 }
 
-type pubSubServiceSubscribeServer struct {
+type metamorphosisPubSubServiceSubscribeServer struct {
 	grpc.ServerStream
 }
 
-func (x *pubSubServiceSubscribeServer) Send(m *SubscribeResponse) error {
+func (x *metamorphosisPubSubServiceSubscribeServer) Send(m *SubscribeResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *pubSubServiceSubscribeServer) Recv() (*SubscribeRequest, error) {
+func (x *metamorphosisPubSubServiceSubscribeServer) Recv() (*SubscribeRequest, error) {
 	m := new(SubscribeRequest)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -450,20 +420,20 @@ func (x *pubSubServiceSubscribeServer) Recv() (*SubscribeRequest, error) {
 	return m, nil
 }
 
-var _PubSubService_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "pb.PubSubService",
-	HandlerType: (*PubSubServiceServer)(nil),
+var _MetamorphosisPubSubService_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "pb.MetamorphosisPubSubService",
+	HandlerType: (*MetamorphosisPubSubServiceServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Publish",
-			Handler:       _PubSubService_Publish_Handler,
+			Handler:       _MetamorphosisPubSubService_Publish_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
 		{
 			StreamName:    "Subscribe",
-			Handler:       _PubSubService_Subscribe_Handler,
+			Handler:       _MetamorphosisPubSubService_Subscribe_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
@@ -471,7 +441,7 @@ var _PubSubService_serviceDesc = grpc.ServiceDesc{
 	Metadata: "pb/api_definitions.proto",
 }
 
-func (m *PutRequest) Marshal() (dAtA []byte, err error) {
+func (m *CreateTopicRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalTo(dAtA)
@@ -481,141 +451,127 @@ func (m *PutRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PutRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *CreateTopicRequest) MarshalTo(dAtA []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
 	_ = l
-	if len(m.Key) > 0 {
+	if len(m.TopicName) > 0 {
 		dAtA[i] = 0xa
 		i++
-		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.Key)))
-		i += copy(dAtA[i:], m.Key)
+		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.TopicName)))
+		i += copy(dAtA[i:], m.TopicName)
 	}
-	if len(m.Value) > 0 {
-		dAtA[i] = 0x12
+	return i, nil
+}
+
+func (m *CreateTopicResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CreateTopicResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Ok {
+		dAtA[i] = 0x8
 		i++
-		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.Value)))
-		i += copy(dAtA[i:], m.Value)
-	}
-	return i, nil
-}
-
-func (m *PutResponse) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *PutResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	return i, nil
-}
-
-func (m *GetRequest) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *GetRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if len(m.Key) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.Key)))
-		i += copy(dAtA[i:], m.Key)
-	}
-	return i, nil
-}
-
-func (m *GetResponse) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *GetResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if len(m.Value) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.Value)))
-		i += copy(dAtA[i:], m.Value)
-	}
-	return i, nil
-}
-
-func (m *ListRequest) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *ListRequest) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	return i, nil
-}
-
-func (m *ListResponse) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *ListResponse) MarshalTo(dAtA []byte) (int, error) {
-	var i int
-	_ = i
-	var l int
-	_ = l
-	if len(m.M) > 0 {
-		for k, _ := range m.M {
-			dAtA[i] = 0xa
-			i++
-			v := m.M[k]
-			mapSize := 1 + len(k) + sovApiDefinitions(uint64(len(k))) + 1 + len(v) + sovApiDefinitions(uint64(len(v)))
-			i = encodeVarintApiDefinitions(dAtA, i, uint64(mapSize))
-			dAtA[i] = 0xa
-			i++
-			i = encodeVarintApiDefinitions(dAtA, i, uint64(len(k)))
-			i += copy(dAtA[i:], k)
-			dAtA[i] = 0x12
-			i++
-			i = encodeVarintApiDefinitions(dAtA, i, uint64(len(v)))
-			i += copy(dAtA[i:], v)
+		if m.Ok {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
 		}
+		i++
+	}
+	return i, nil
+}
+
+func (m *ListTopicsRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ListTopicsRequest) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.NamePrefix) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.NamePrefix)))
+		i += copy(dAtA[i:], m.NamePrefix)
+	}
+	return i, nil
+}
+
+func (m *ListTopicsResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ListTopicsResponse) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Metadata) > 0 {
+		for _, msg := range m.Metadata {
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintApiDefinitions(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *TopicMetadata) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TopicMetadata) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Name) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.Name)))
+		i += copy(dAtA[i:], m.Name)
+	}
+	if m.Size_ != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintApiDefinitions(dAtA, i, uint64(m.Size_))
 	}
 	return i, nil
 }
@@ -671,11 +627,22 @@ func (m *PublishResponse) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.CommittedEntryKey) > 0 {
+	if len(m.Error) > 0 {
 		dAtA[i] = 0xa
+		i++
+		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.Error)))
+		i += copy(dAtA[i:], m.Error)
+	}
+	if len(m.CommittedEntryKey) > 0 {
+		dAtA[i] = 0x12
 		i++
 		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.CommittedEntryKey)))
 		i += copy(dAtA[i:], m.CommittedEntryKey)
+	}
+	if m.Offset != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintApiDefinitions(dAtA, i, uint64(m.Offset))
 	}
 	return i, nil
 }
@@ -701,11 +668,10 @@ func (m *SubscribeRequest) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.Topic)))
 		i += copy(dAtA[i:], m.Topic)
 	}
-	if len(m.StartingEntryKey) > 0 {
-		dAtA[i] = 0x12
+	if m.StartingOffset != 0 {
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.StartingEntryKey)))
-		i += copy(dAtA[i:], m.StartingEntryKey)
+		i = encodeVarintApiDefinitions(dAtA, i, uint64(m.StartingOffset))
 	}
 	if len(m.CommittedEntryKey) > 0 {
 		dAtA[i] = 0x1a
@@ -731,17 +697,32 @@ func (m *SubscribeResponse) MarshalTo(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.EntryKey) > 0 {
+	if len(m.Error) > 0 {
 		dAtA[i] = 0xa
 		i++
-		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.EntryKey)))
-		i += copy(dAtA[i:], m.EntryKey)
+		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.Error)))
+		i += copy(dAtA[i:], m.Error)
 	}
-	if len(m.EntryData) > 0 {
-		dAtA[i] = 0x12
+	if m.StartingOffset != 0 {
+		dAtA[i] = 0x10
 		i++
-		i = encodeVarintApiDefinitions(dAtA, i, uint64(len(m.EntryData)))
-		i += copy(dAtA[i:], m.EntryData)
+		i = encodeVarintApiDefinitions(dAtA, i, uint64(m.StartingOffset))
+	}
+	if len(m.EntryKeys) > 0 {
+		for _, b := range m.EntryKeys {
+			dAtA[i] = 0x1a
+			i++
+			i = encodeVarintApiDefinitions(dAtA, i, uint64(len(b)))
+			i += copy(dAtA[i:], b)
+		}
+	}
+	if len(m.EntryValues) > 0 {
+		for _, b := range m.EntryValues {
+			dAtA[i] = 0x22
+			i++
+			i = encodeVarintApiDefinitions(dAtA, i, uint64(len(b)))
+			i += copy(dAtA[i:], b)
+		}
 	}
 	return i, nil
 }
@@ -755,62 +736,56 @@ func encodeVarintApiDefinitions(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
-func (m *PutRequest) Size() (n int) {
+func (m *CreateTopicRequest) Size() (n int) {
 	var l int
 	_ = l
-	l = len(m.Key)
-	if l > 0 {
-		n += 1 + l + sovApiDefinitions(uint64(l))
-	}
-	l = len(m.Value)
+	l = len(m.TopicName)
 	if l > 0 {
 		n += 1 + l + sovApiDefinitions(uint64(l))
 	}
 	return n
 }
 
-func (m *PutResponse) Size() (n int) {
+func (m *CreateTopicResponse) Size() (n int) {
 	var l int
 	_ = l
+	if m.Ok {
+		n += 2
+	}
 	return n
 }
 
-func (m *GetRequest) Size() (n int) {
+func (m *ListTopicsRequest) Size() (n int) {
 	var l int
 	_ = l
-	l = len(m.Key)
+	l = len(m.NamePrefix)
 	if l > 0 {
 		n += 1 + l + sovApiDefinitions(uint64(l))
 	}
 	return n
 }
 
-func (m *GetResponse) Size() (n int) {
+func (m *ListTopicsResponse) Size() (n int) {
 	var l int
 	_ = l
-	l = len(m.Value)
-	if l > 0 {
-		n += 1 + l + sovApiDefinitions(uint64(l))
-	}
-	return n
-}
-
-func (m *ListRequest) Size() (n int) {
-	var l int
-	_ = l
-	return n
-}
-
-func (m *ListResponse) Size() (n int) {
-	var l int
-	_ = l
-	if len(m.M) > 0 {
-		for k, v := range m.M {
-			_ = k
-			_ = v
-			mapEntrySize := 1 + len(k) + sovApiDefinitions(uint64(len(k))) + 1 + len(v) + sovApiDefinitions(uint64(len(v)))
-			n += mapEntrySize + 1 + sovApiDefinitions(uint64(mapEntrySize))
+	if len(m.Metadata) > 0 {
+		for _, e := range m.Metadata {
+			l = e.Size()
+			n += 1 + l + sovApiDefinitions(uint64(l))
 		}
+	}
+	return n
+}
+
+func (m *TopicMetadata) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovApiDefinitions(uint64(l))
+	}
+	if m.Size_ != 0 {
+		n += 1 + sovApiDefinitions(uint64(m.Size_))
 	}
 	return n
 }
@@ -836,9 +811,16 @@ func (m *PublishRequest) Size() (n int) {
 func (m *PublishResponse) Size() (n int) {
 	var l int
 	_ = l
+	l = len(m.Error)
+	if l > 0 {
+		n += 1 + l + sovApiDefinitions(uint64(l))
+	}
 	l = len(m.CommittedEntryKey)
 	if l > 0 {
 		n += 1 + l + sovApiDefinitions(uint64(l))
+	}
+	if m.Offset != 0 {
+		n += 1 + sovApiDefinitions(uint64(m.Offset))
 	}
 	return n
 }
@@ -850,9 +832,8 @@ func (m *SubscribeRequest) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovApiDefinitions(uint64(l))
 	}
-	l = len(m.StartingEntryKey)
-	if l > 0 {
-		n += 1 + l + sovApiDefinitions(uint64(l))
+	if m.StartingOffset != 0 {
+		n += 1 + sovApiDefinitions(uint64(m.StartingOffset))
 	}
 	l = len(m.CommittedEntryKey)
 	if l > 0 {
@@ -864,13 +845,24 @@ func (m *SubscribeRequest) Size() (n int) {
 func (m *SubscribeResponse) Size() (n int) {
 	var l int
 	_ = l
-	l = len(m.EntryKey)
+	l = len(m.Error)
 	if l > 0 {
 		n += 1 + l + sovApiDefinitions(uint64(l))
 	}
-	l = len(m.EntryData)
-	if l > 0 {
-		n += 1 + l + sovApiDefinitions(uint64(l))
+	if m.StartingOffset != 0 {
+		n += 1 + sovApiDefinitions(uint64(m.StartingOffset))
+	}
+	if len(m.EntryKeys) > 0 {
+		for _, b := range m.EntryKeys {
+			l = len(b)
+			n += 1 + l + sovApiDefinitions(uint64(l))
+		}
+	}
+	if len(m.EntryValues) > 0 {
+		for _, b := range m.EntryValues {
+			l = len(b)
+			n += 1 + l + sovApiDefinitions(uint64(l))
+		}
 	}
 	return n
 }
@@ -888,7 +880,7 @@ func sovApiDefinitions(x uint64) (n int) {
 func sozApiDefinitions(x uint64) (n int) {
 	return sovApiDefinitions(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *PutRequest) Unmarshal(dAtA []byte) error {
+func (m *CreateTopicRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -911,15 +903,15 @@ func (m *PutRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PutRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: CreateTopicRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PutRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CreateTopicRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Key", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field TopicName", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -944,11 +936,131 @@ func (m *PutRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Key = string(dAtA[iNdEx:postIndex])
+			m.TopicName = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 2:
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApiDefinitions(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApiDefinitions
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CreateTopicResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApiDefinitions
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CreateTopicResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CreateTopicResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ok", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApiDefinitions
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Ok = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApiDefinitions(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApiDefinitions
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ListTopicsRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApiDefinitions
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ListTopicsRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ListTopicsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Value", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field NamePrefix", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -973,7 +1085,7 @@ func (m *PutRequest) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Value = string(dAtA[iNdEx:postIndex])
+			m.NamePrefix = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -996,7 +1108,7 @@ func (m *PutRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PutResponse) Unmarshal(dAtA []byte) error {
+func (m *ListTopicsResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1019,273 +1131,15 @@ func (m *PutResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PutResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: ListTopicsResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PutResponse: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		default:
-			iNdEx = preIndex
-			skippy, err := skipApiDefinitions(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthApiDefinitions
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *GetRequest) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowApiDefinitions
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: GetRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: GetRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ListTopicsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Key", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowApiDefinitions
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthApiDefinitions
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Key = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipApiDefinitions(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthApiDefinitions
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *GetResponse) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowApiDefinitions
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: GetResponse: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: GetResponse: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Value", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowApiDefinitions
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= (uint64(b) & 0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthApiDefinitions
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Value = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipApiDefinitions(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthApiDefinitions
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ListRequest) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowApiDefinitions
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ListRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ListRequest: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		default:
-			iNdEx = preIndex
-			skippy, err := skipApiDefinitions(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if skippy < 0 {
-				return ErrInvalidLengthApiDefinitions
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *ListResponse) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowApiDefinitions
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= (uint64(b) & 0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: ListResponse: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ListResponse: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field M", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Metadata", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1309,98 +1163,109 @@ func (m *ListResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.M == nil {
-				m.M = make(map[string]string)
+			m.Metadata = append(m.Metadata, &TopicMetadata{})
+			if err := m.Metadata[len(m.Metadata)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
-			var mapkey string
-			var mapvalue string
-			for iNdEx < postIndex {
-				entryPreIndex := iNdEx
-				var wire uint64
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowApiDefinitions
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					wire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				fieldNum := int32(wire >> 3)
-				if fieldNum == 1 {
-					var stringLenmapkey uint64
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowApiDefinitions
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						stringLenmapkey |= (uint64(b) & 0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-					intStringLenmapkey := int(stringLenmapkey)
-					if intStringLenmapkey < 0 {
-						return ErrInvalidLengthApiDefinitions
-					}
-					postStringIndexmapkey := iNdEx + intStringLenmapkey
-					if postStringIndexmapkey > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
-					iNdEx = postStringIndexmapkey
-				} else if fieldNum == 2 {
-					var stringLenmapvalue uint64
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowApiDefinitions
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						stringLenmapvalue |= (uint64(b) & 0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-					intStringLenmapvalue := int(stringLenmapvalue)
-					if intStringLenmapvalue < 0 {
-						return ErrInvalidLengthApiDefinitions
-					}
-					postStringIndexmapvalue := iNdEx + intStringLenmapvalue
-					if postStringIndexmapvalue > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapvalue = string(dAtA[iNdEx:postStringIndexmapvalue])
-					iNdEx = postStringIndexmapvalue
-				} else {
-					iNdEx = entryPreIndex
-					skippy, err := skipApiDefinitions(dAtA[iNdEx:])
-					if err != nil {
-						return err
-					}
-					if skippy < 0 {
-						return ErrInvalidLengthApiDefinitions
-					}
-					if (iNdEx + skippy) > postIndex {
-						return io.ErrUnexpectedEOF
-					}
-					iNdEx += skippy
-				}
-			}
-			m.M[mapkey] = mapvalue
 			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApiDefinitions(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApiDefinitions
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TopicMetadata) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApiDefinitions
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TopicMetadata: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TopicMetadata: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApiDefinitions
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApiDefinitions
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Size_", wireType)
+			}
+			m.Size_ = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApiDefinitions
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Size_ |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApiDefinitions(dAtA[iNdEx:])
@@ -1594,6 +1459,35 @@ func (m *PublishResponse) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Error", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApiDefinitions
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApiDefinitions
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Error = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field CommittedEntryKey", wireType)
 			}
 			var byteLen int
@@ -1623,6 +1517,25 @@ func (m *PublishResponse) Unmarshal(dAtA []byte) error {
 				m.CommittedEntryKey = []byte{}
 			}
 			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Offset", wireType)
+			}
+			m.Offset = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApiDefinitions
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Offset |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApiDefinitions(dAtA[iNdEx:])
@@ -1703,10 +1616,10 @@ func (m *SubscribeRequest) Unmarshal(dAtA []byte) error {
 			m.Topic = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field StartingEntryKey", wireType)
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StartingOffset", wireType)
 			}
-			var byteLen int
+			m.StartingOffset = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowApiDefinitions
@@ -1716,23 +1629,11 @@ func (m *SubscribeRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				byteLen |= (int(b) & 0x7F) << shift
+				m.StartingOffset |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if byteLen < 0 {
-				return ErrInvalidLengthApiDefinitions
-			}
-			postIndex := iNdEx + byteLen
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.StartingEntryKey = append(m.StartingEntryKey[:0], dAtA[iNdEx:postIndex]...)
-			if m.StartingEntryKey == nil {
-				m.StartingEntryKey = []byte{}
-			}
-			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field CommittedEntryKey", wireType)
@@ -1816,9 +1717,9 @@ func (m *SubscribeResponse) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field EntryKey", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Error", wireType)
 			}
-			var byteLen int
+			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowApiDefinitions
@@ -1828,26 +1729,43 @@ func (m *SubscribeResponse) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				byteLen |= (int(b) & 0x7F) << shift
+				stringLen |= (uint64(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if byteLen < 0 {
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
 				return ErrInvalidLengthApiDefinitions
 			}
-			postIndex := iNdEx + byteLen
+			postIndex := iNdEx + intStringLen
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.EntryKey = append(m.EntryKey[:0], dAtA[iNdEx:postIndex]...)
-			if m.EntryKey == nil {
-				m.EntryKey = []byte{}
-			}
+			m.Error = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StartingOffset", wireType)
+			}
+			m.StartingOffset = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApiDefinitions
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StartingOffset |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field EntryData", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field EntryKeys", wireType)
 			}
 			var byteLen int
 			for shift := uint(0); ; shift += 7 {
@@ -1871,10 +1789,37 @@ func (m *SubscribeResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.EntryData = append(m.EntryData[:0], dAtA[iNdEx:postIndex]...)
-			if m.EntryData == nil {
-				m.EntryData = []byte{}
+			m.EntryKeys = append(m.EntryKeys, make([]byte, postIndex-iNdEx))
+			copy(m.EntryKeys[len(m.EntryKeys)-1], dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EntryValues", wireType)
 			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApiDefinitions
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthApiDefinitions
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EntryValues = append(m.EntryValues, make([]byte, postIndex-iNdEx))
+			copy(m.EntryValues[len(m.EntryValues)-1], dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -2005,36 +1950,39 @@ var (
 func init() { proto.RegisterFile("pb/api_definitions.proto", fileDescriptorApiDefinitions) }
 
 var fileDescriptorApiDefinitions = []byte{
-	// 485 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x53, 0xcb, 0x6e, 0xd3, 0x40,
-	0x14, 0xf5, 0xc4, 0xb4, 0x90, 0x9b, 0xb6, 0x49, 0x07, 0x23, 0x2c, 0x0b, 0x59, 0xd5, 0x20, 0xa4,
-	0x08, 0x50, 0x8a, 0x42, 0x17, 0x15, 0x0b, 0x90, 0x78, 0xa8, 0x0b, 0x88, 0x14, 0x25, 0x88, 0x2d,
-	0x78, 0xd2, 0x21, 0x1d, 0xa5, 0xf6, 0x18, 0xcf, 0xb8, 0x52, 0xb7, 0xec, 0xf8, 0x02, 0x7e, 0xa9,
-	0xcb, 0x7e, 0x02, 0xcd, 0x97, 0xa0, 0x99, 0xf1, 0x0b, 0x97, 0x76, 0x37, 0xe7, 0x3e, 0x8e, 0xcf,
-	0xbd, 0xf7, 0x18, 0xfc, 0x94, 0xee, 0x47, 0x29, 0xff, 0x7a, 0xcc, 0xbe, 0xf3, 0x84, 0x2b, 0x2e,
-	0x12, 0x39, 0x4a, 0x33, 0xa1, 0x04, 0xee, 0xa4, 0x34, 0xf0, 0x96, 0x62, 0x29, 0x0c, 0xdc, 0xd7,
-	0x2f, 0x9b, 0x21, 0x07, 0x00, 0xd3, 0x5c, 0xcd, 0xd8, 0x8f, 0x9c, 0x49, 0x85, 0x07, 0xe0, 0x7e,
-	0x64, 0xe7, 0x3e, 0xda, 0x43, 0xc3, 0xee, 0x4c, 0x3f, 0xb1, 0x07, 0x1b, 0x5f, 0xa2, 0xd3, 0x9c,
-	0xf9, 0x1d, 0x13, 0xb3, 0x80, 0x6c, 0x43, 0xcf, 0x74, 0xc9, 0x54, 0x24, 0x92, 0x91, 0x10, 0xe0,
-	0x88, 0xdd, 0x4c, 0x42, 0x1e, 0x43, 0xcf, 0xe4, 0x6d, 0x79, 0xcd, 0x89, 0x5a, 0x9c, 0x9f, 0xb8,
-	0x2c, 0x59, 0xc8, 0x0a, 0xb6, 0x2c, 0x2c, 0x9a, 0x9e, 0x00, 0x8a, 0x7d, 0xb4, 0xe7, 0x0e, 0x7b,
-	0xe3, 0x87, 0xa3, 0x94, 0x8e, 0x9a, 0xc9, 0xd1, 0xe4, 0x43, 0xa2, 0xb2, 0xf3, 0x19, 0x8a, 0x83,
-	0x03, 0xd8, 0xb4, 0x40, 0xcb, 0x58, 0xd5, 0x32, 0x56, 0x76, 0x96, 0xb3, 0xe6, 0x2c, 0x06, 0xbc,
-	0xea, 0x1c, 0x22, 0xf2, 0x0d, 0x76, 0xa6, 0x39, 0x3d, 0xe5, 0xf2, 0xa4, 0x1c, 0xc2, 0x83, 0x8d,
-	0xcf, 0x22, 0xe5, 0x8b, 0x52, 0xa3, 0x01, 0x38, 0x80, 0x7b, 0x86, 0x5c, 0xcf, 0xa7, 0x49, 0xb6,
-	0x66, 0x15, 0xc6, 0x8f, 0xa0, 0x6b, 0xde, 0xef, 0x23, 0x15, 0xf9, 0xae, 0x49, 0xd6, 0x01, 0xf2,
-	0x06, 0xfa, 0xd5, 0x17, 0x8a, 0x89, 0x9e, 0xc3, 0xee, 0x3b, 0x11, 0xc7, 0x5c, 0x29, 0x76, 0x5c,
-	0xb1, 0x22, 0xd3, 0x78, 0x3d, 0x41, 0x7e, 0x22, 0x18, 0xcc, 0x73, 0x2a, 0x17, 0x19, 0xa7, 0xec,
-	0x76, 0x95, 0x4f, 0x61, 0x30, 0x57, 0x51, 0xa6, 0x78, 0xb2, 0x6c, 0xa9, 0xbd, 0x16, 0xff, 0xbf,
-	0x08, 0xf7, 0x26, 0x11, 0x13, 0xd8, 0x6d, 0x68, 0x28, 0xe6, 0x68, 0x2e, 0x05, 0xdd, 0xb6, 0x94,
-	0x4e, 0x6b, 0x29, 0xe3, 0xdf, 0x08, 0xbc, 0x09, 0x53, 0x51, 0x2c, 0xb2, 0xf4, 0x44, 0x48, 0x2e,
-	0xe7, 0x2c, 0x3b, 0xe3, 0x0b, 0x86, 0x87, 0xe0, 0x4e, 0x73, 0x85, 0x77, 0xf4, 0xa1, 0x6b, 0x7b,
-	0x06, 0xfd, 0x0a, 0x17, 0xc6, 0x73, 0x74, 0xe5, 0x11, 0x2b, 0x2a, 0x6b, 0x0f, 0xda, 0xca, 0x86,
-	0xe7, 0x88, 0x83, 0x9f, 0xc1, 0x1d, 0xed, 0x19, 0xdc, 0xaf, 0xdd, 0x63, 0x6b, 0x07, 0x6d, 0x3b,
-	0x11, 0x67, 0xfc, 0x0b, 0xc1, 0xf6, 0x34, 0xa7, 0xf3, 0x9c, 0x96, 0x92, 0x0e, 0xe1, 0x6e, 0x71,
-	0x40, 0x8c, 0xad, 0x8c, 0xa6, 0x5f, 0x82, 0xfb, 0xff, 0xc4, 0x4a, 0x9e, 0x21, 0x7a, 0x81, 0xf0,
-	0x6b, 0xe8, 0x56, 0x4b, 0xc3, 0x9e, 0xae, 0x6b, 0xdf, 0x31, 0x78, 0xd0, 0x8a, 0x36, 0xfb, 0xdf,
-	0x7a, 0x17, 0x57, 0xa1, 0x73, 0x79, 0x15, 0x3a, 0x17, 0xeb, 0x10, 0x5d, 0xae, 0x43, 0xf4, 0x67,
-	0x1d, 0x22, 0xba, 0x69, 0xfe, 0xdf, 0x97, 0x7f, 0x03, 0x00, 0x00, 0xff, 0xff, 0x60, 0x57, 0xc9,
-	0x3d, 0xf5, 0x03, 0x00, 0x00,
+	// 537 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x54, 0xc1, 0x6e, 0xd3, 0x40,
+	0x10, 0xed, 0x26, 0x69, 0x49, 0x26, 0x10, 0xc8, 0x36, 0x0d, 0x96, 0x55, 0x59, 0xd1, 0x4a, 0xa0,
+	0x1c, 0x20, 0x45, 0xe9, 0x01, 0x2e, 0x20, 0x44, 0xe8, 0xa9, 0x40, 0x22, 0x07, 0x71, 0x05, 0x3b,
+	0xd9, 0xa4, 0xab, 0xd6, 0x59, 0xb3, 0xbb, 0x46, 0x84, 0x03, 0xff, 0xc0, 0x85, 0x2b, 0xbf, 0xd3,
+	0x63, 0x3f, 0x81, 0xe6, 0x4b, 0xd0, 0x6e, 0x6c, 0xc7, 0x76, 0xa0, 0xe2, 0xb6, 0xf3, 0x66, 0xe6,
+	0xcd, 0x9b, 0xc9, 0x73, 0xc0, 0x0a, 0xfd, 0x23, 0x2f, 0x64, 0x1f, 0xa7, 0x74, 0xc6, 0x16, 0x4c,
+	0x31, 0xbe, 0x90, 0xbd, 0x50, 0x70, 0xc5, 0x71, 0x29, 0xf4, 0xed, 0xd6, 0x9c, 0xcf, 0xb9, 0x09,
+	0x8f, 0xf4, 0x6b, 0x9d, 0x21, 0x7d, 0xc0, 0x03, 0x41, 0x3d, 0x45, 0xdf, 0xf3, 0x90, 0x4d, 0x5c,
+	0xfa, 0x39, 0xa2, 0x52, 0xe1, 0x43, 0xa8, 0x99, 0xf8, 0x9d, 0x17, 0x50, 0x0b, 0x75, 0x50, 0xb7,
+	0xe6, 0x6e, 0x00, 0xf2, 0x00, 0xf6, 0x73, 0x3d, 0x32, 0xe4, 0x0b, 0x49, 0x71, 0x03, 0x4a, 0xc3,
+	0x73, 0x53, 0x5d, 0x75, 0x4b, 0xc3, 0x73, 0x72, 0x0c, 0xcd, 0x37, 0x4c, 0x2a, 0x53, 0x24, 0x13,
+	0x66, 0x07, 0x40, 0x73, 0x8c, 0x04, 0x9d, 0xb1, 0xaf, 0x31, 0x75, 0x06, 0x21, 0x03, 0xc0, 0xd9,
+	0xa6, 0x98, 0xfa, 0x31, 0x54, 0x03, 0xaa, 0xbc, 0xa9, 0xa7, 0x3c, 0x0b, 0x75, 0xca, 0xdd, 0x7a,
+	0xbf, 0xd9, 0x0b, 0xfd, 0x9e, 0xa9, 0x7a, 0x1b, 0x27, 0xdc, 0xb4, 0x84, 0x3c, 0x85, 0x3b, 0xb9,
+	0x14, 0xc6, 0x50, 0xc9, 0xac, 0x62, 0xde, 0x1a, 0x1b, 0xb3, 0x6f, 0xd4, 0x2a, 0x75, 0x50, 0xb7,
+	0xe2, 0x9a, 0x37, 0xf9, 0x04, 0x8d, 0x51, 0xe4, 0x5f, 0x30, 0x79, 0x96, 0xe8, 0x6d, 0xc1, 0xae,
+	0xa1, 0x8a, 0x5b, 0xd7, 0x01, 0xb6, 0xa1, 0x7a, 0xb2, 0x50, 0x62, 0x79, 0x4a, 0x97, 0xa6, 0xff,
+	0xb6, 0x9b, 0xc6, 0xfa, 0x76, 0xe6, 0xfd, 0x5a, 0x8b, 0x2d, 0x9b, 0xe4, 0x06, 0x20, 0x01, 0xdc,
+	0x4d, 0x27, 0xc4, 0xcb, 0xb5, 0x60, 0xf7, 0x44, 0x08, 0x2e, 0x92, 0x11, 0x26, 0xc0, 0x8f, 0xa0,
+	0x39, 0xe0, 0x41, 0xc0, 0x94, 0xa2, 0xd3, 0xc2, 0xac, 0xed, 0x04, 0x6e, 0xc3, 0xde, 0x70, 0x36,
+	0x93, 0x54, 0x99, 0x89, 0x15, 0x37, 0x8e, 0xc8, 0x77, 0xb8, 0x37, 0x8e, 0x7c, 0x39, 0x11, 0xcc,
+	0xa7, 0x37, 0xaf, 0xf4, 0x10, 0x1a, 0x63, 0xe5, 0x09, 0xc5, 0x16, 0xf3, 0x98, 0x69, 0x7d, 0x98,
+	0x02, 0xfa, 0x77, 0x5d, 0xe5, 0x7f, 0xe8, 0x22, 0x3f, 0x10, 0x34, 0x33, 0x02, 0x6e, 0xdc, 0xf8,
+	0x7f, 0x15, 0x24, 0x07, 0x3e, 0xa5, 0x4b, 0x69, 0x95, 0x3b, 0xe5, 0xf4, 0xc0, 0x1a, 0xc0, 0x1d,
+	0xa8, 0x9b, 0xe0, 0x83, 0x77, 0x11, 0x51, 0x69, 0x55, 0x4c, 0x3e, 0x0b, 0xf5, 0x7f, 0x21, 0x38,
+	0xd4, 0xce, 0x08, 0xb8, 0x08, 0xcf, 0xb8, 0x64, 0x32, 0xb1, 0xc9, 0x98, 0x8a, 0x2f, 0x6c, 0x42,
+	0xf1, 0x4b, 0xa8, 0x67, 0xfc, 0x8d, 0xdb, 0xda, 0x6a, 0xdb, 0x1f, 0x89, 0x7d, 0x7f, 0x0b, 0x5f,
+	0xaf, 0x47, 0x76, 0xf0, 0x73, 0x80, 0x8d, 0x8b, 0xf1, 0x81, 0x2e, 0xdc, 0xfa, 0x14, 0xec, 0x76,
+	0x11, 0x4e, 0xda, 0xfb, 0x3f, 0x11, 0xd8, 0x39, 0x85, 0xa3, 0xc8, 0x1f, 0x47, 0x7e, 0xa2, 0xef,
+	0x19, 0xdc, 0x8a, 0x3d, 0x84, 0xb1, 0xe6, 0xc8, 0x5b, 0xd6, 0xde, 0xcf, 0x61, 0x09, 0x69, 0x17,
+	0x3d, 0x41, 0xf8, 0x05, 0xd4, 0xd2, 0x5f, 0x03, 0xb7, 0x74, 0x5d, 0xd1, 0x1d, 0xf6, 0x41, 0x01,
+	0xcd, 0xf6, 0xbf, 0x6a, 0x5d, 0x5e, 0x3b, 0x3b, 0x57, 0xd7, 0xce, 0xce, 0xe5, 0xca, 0x41, 0x57,
+	0x2b, 0x07, 0xfd, 0x5e, 0x39, 0xc8, 0xdf, 0x33, 0x7f, 0x25, 0xc7, 0x7f, 0x02, 0x00, 0x00, 0xff,
+	0xff, 0x03, 0x13, 0x6d, 0x94, 0x80, 0x04, 0x00, 0x00,
 }

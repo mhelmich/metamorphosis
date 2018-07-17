@@ -16,6 +16,7 @@
 **/vendor/*
 
 # test data dirs
+**/Test*/*
 **/test-*/*
 **/metamorphosis.db*/*
 

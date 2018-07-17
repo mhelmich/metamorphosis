@@ -47,6 +47,8 @@ func main() {
 		logrus.Panicf("Can't load configs: %s", err)
 	}
 
+	dataDir := viperConfig.GetString("data-dir")
+
 	copycatConfig := copycat.DefaultConfig()
 	// set host name to external IP address
 	// copycatConfig.Hostname = getOutboundIP().To4().String()
@@ -54,7 +56,7 @@ func main() {
 	copycatConfig.Hostname = "127.0.0.1"
 	copycatConfig.CopyCatPort = viperConfig.GetInt("copycat-port")
 	copycatConfig.GossipPort = viperConfig.GetInt("gossip-port")
-	copycatConfig.CopyCatDataDir = viperConfig.GetString("copycat-dir")
+	copycatConfig.CopyCatDataDir = dataDir + "copycat/"
 	// in viper env vars are case sensitive
 	// docker only allows for capitilized env vars!?!
 	copycatConfig.PeersToContact = viperConfig.GetStringSlice("COPYCAT_PEERS")
@@ -72,16 +74,23 @@ func main() {
 		logrus.Panicf("Can't start app: %s", err.Error())
 	}
 
-	httpServer := newHttpServer(httpPort, cc)
-	go func() {
-		logrus.Infof("Firing up http server on %s", httpServer.Addr)
-		if err := httpServer.ListenAndServe(); err != nil {
-			logrus.Errorf("%s", err.Error())
-		}
-	}()
+	tm, err := newTopicManager(dataDir, cc)
+	if err != nil {
+		logrus.Panicf("Can't start http server: %s", err.Error())
+	}
+
+	httpServer, err := startNewHttpServer(httpPort, tm)
+	if err != nil {
+		logrus.Panicf("Can't start http server: %s", err.Error())
+	}
+
+	grpcServer, err := startNewGrpcServer(grpcPort, tm)
+	if err != nil {
+		logrus.Panicf("Can't start grpc server: %s", err.Error())
+	}
 
 	sig := <-c
-	cleanup(sig, copycatConfig.CopyCatDataDir, cc, httpServer)
+	cleanup(sig, copycatConfig.CopyCatDataDir, cc, httpServer, grpcServer)
 }
 
 // get preferred outbound ip of this machine
@@ -98,19 +107,6 @@ func getOutboundIP() net.IP {
 	return localAddr.IP
 }
 
-// func startGrpcServer(port int) {
-// 	logrus.Infof("Firing up grpc server...")
-// 	lis, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
-// 	if err != nil {
-// 		logrus.Panicf("%s", err.Error())
-// 	}
-//
-// 	grpcServer := grpc.NewServer()
-// 	pb.RegisterPubSubServiceServer(grpcServer, &pubSubServer{})
-// 	grpcServer.Serve(lis)
-// 	logrus.Error("Stopped grpc server!")
-// }
-
 func loadConfig(configPath string) (*viper.Viper, error) {
 	logrus.Infof("Loading config at %s", configPath)
 	viperConfig := viper.New()
@@ -125,15 +121,17 @@ func loadConfig(configPath string) (*viper.Viper, error) {
 	return viperConfig, err
 }
 
-func cleanup(sig os.Signal, dataDir string, cc copycat.CopyCat, httpServer *httpServer) {
+func cleanup(sig os.Signal, dataDir string, cc copycat.CopyCat, httpServer *httpServer, grpcServer *grpcServer) {
 	logrus.Info("This node is going down gracefully\n")
 	logrus.Infof("Received signal: %s\n", sig)
-
-	cc.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	httpServer.Shutdown(ctx)
+
+	grpcServer.stop()
+
+	cc.Shutdown()
 
 	err := os.RemoveAll(dataDir)
 	if err != nil {

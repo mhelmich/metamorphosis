@@ -17,43 +17,26 @@
 package main
 
 import (
-	"sync"
+	"io"
+	"time"
 
-	"github.com/sirupsen/logrus"
+	metrics "github.com/rcrowley/go-metrics"
 )
 
-func newContextWait() *contextWait {
-	return &contextWait{
-		m:    make(map[uint64]chan interface{}),
-		lock: &sync.Mutex{},
-	}
+type timer interface {
+	Time(func())
+	Update(time.Duration)
+	UpdateSince(time.Time)
 }
 
-type contextWait struct {
-	m    map[uint64]chan interface{}
-	lock *sync.Mutex
+func writeMetricsAsJSON(w io.Writer) {
+	metrics.WriteJSONOnce(metrics.DefaultRegistry, w)
 }
 
-func (w *contextWait) register(id uint64) <-chan interface{} {
-	w.lock.Lock()
-	_, ok := w.m[id]
-	if ok {
-		logrus.Panic("dup waiter id")
-	}
-
-	ch := make(chan interface{})
-	w.m[id] = ch
-	w.lock.Unlock()
-	return ch
+func getOrRegisterTimer(metricName string) timer {
+	return metrics.GetOrRegisterTimer(metricName, metrics.DefaultRegistry)
 }
 
-func (w *contextWait) trigger(id uint64, value interface{}) {
-	w.lock.Lock()
-	ch, ok := w.m[id]
-	if ok {
-		delete(w.m, id)
-		ch <- value
-		close(ch)
-	}
-	w.lock.Unlock()
+func unregisterMetric(metricName string) {
+	metrics.Unregister(metricName)
 }

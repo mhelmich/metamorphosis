@@ -16,7 +16,8 @@
 
 copycat-port: 13000
 gossip-port: 13100
-copycat-dir: "./metamorphosis.db2/"
+# copycat-dir: "./metamorphosis.db2/"
+data-dir: "./metamorphosis.db2/"
 COPYCAT_PEERS:
 - "127.0.0.1:12100"
 
