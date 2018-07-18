@@ -121,7 +121,6 @@ func (s *grpcServer) Subscribe(stream pb.MetamorphosisPubSubService_SubscribeSer
 			}
 		}
 
-		logrus.Infof("log %s", l.getTopicName())
 		entries, err = l.readFromOffset(request.StartingOffset, 10)
 		if err != nil {
 			stream.Send(&pb.SubscribeResponse{

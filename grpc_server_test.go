@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/mhelmich/metamorphosis/pb"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 )
@@ -166,7 +165,6 @@ func TestGrpcServerConcurrent(t *testing.T) {
 				assert.Nil(t, err)
 				subResp, err = subStream.Recv()
 				assert.Nil(t, err)
-				logrus.Infof("subResp: %s", subResp.String())
 				offset = subResp.StartingOffset + uint64(len(subResp.EntryKeys))
 				assert.Equal(t, len(subResp.EntryKeys), len(subResp.EntryValues))
 				// assert.Equal(t, key, subResp.EntryKeys[0])
