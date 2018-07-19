@@ -101,9 +101,13 @@ message SubscribeRequest {
   bytes CommittedEntryKey = 3;
 }
 
+message LogRecord {
+  uint64 Offset = 1;
+  bytes Key = 2;
+  bytes Value = 3;
+}
+
 message SubscribeResponse {
   string Error = 1;
-  uint64 StartingOffset = 2;
-  repeated bytes EntryKeys = 3;
-  repeated bytes EntryValues = 4;
+  repeated LogRecord records = 2;
 }

@@ -130,22 +130,17 @@ func (s *grpcServer) Subscribe(stream pb.MetamorphosisPubSubService_SubscribeSer
 			return err
 		}
 
-		keys := make([][]byte, len(entries))
-		values := make([][]byte, len(entries))
+		records := make([]*pb.LogRecord, len(entries))
 		for idx := range entries {
-			keys[idx] = entries[idx].Key
-			values[idx] = entries[idx].Value
+			records[idx] = &pb.LogRecord{
+				Key:    entries[idx].Key,
+				Value:  entries[idx].Value,
+				Offset: entries[idx].Offset,
+			}
 		}
 
-		var startingOffset uint64
-		if len(entries) > 0 {
-			startingOffset = entries[0].Offset
-		} // else startingOffset => 0
-
 		err = stream.Send(&pb.SubscribeResponse{
-			StartingOffset: startingOffset,
-			EntryKeys:      keys,
-			EntryValues:    values,
+			Records: records,
 		})
 		if err != nil {
 			// TODO - figure out how to give a log back without closing it

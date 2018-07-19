@@ -80,10 +80,9 @@ func TestGrpcServerBasic(t *testing.T) {
 	assert.Nil(t, err)
 	subResp, err := subStream.Recv()
 	assert.Nil(t, err)
-	assert.Equal(t, 1, len(subResp.EntryKeys))
-	assert.Equal(t, 1, len(subResp.EntryValues))
-	assert.Equal(t, key, subResp.EntryKeys[0])
-	assert.Equal(t, value, subResp.EntryValues[0])
+	assert.Equal(t, 1, len(subResp.Records))
+	assert.Equal(t, key, subResp.Records[0].Key)
+	assert.Equal(t, value, subResp.Records[0].Value)
 	err = subStream.CloseSend()
 	assert.Nil(t, err)
 
@@ -165,10 +164,9 @@ func TestGrpcServerConcurrent(t *testing.T) {
 				assert.Nil(t, err)
 				subResp, err = subStream.Recv()
 				assert.Nil(t, err)
-				offset = subResp.StartingOffset + uint64(len(subResp.EntryKeys))
-				assert.Equal(t, len(subResp.EntryKeys), len(subResp.EntryValues))
-				// assert.Equal(t, key, subResp.EntryKeys[0])
-				// assert.Equal(t, value, subResp.EntryValues[0])
+				if len(subResp.Records) > 0 {
+					offset = subResp.Records[len(subResp.Records)-1].Offset + 1
+				}
 			}
 
 			err = subStream.CloseSend()
