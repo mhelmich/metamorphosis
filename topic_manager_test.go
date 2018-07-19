@@ -51,8 +51,49 @@ func TestTopicManagerBasic(t *testing.T) {
 	l, err := tm.getTopicForName(topic2)
 	assert.Nil(t, err)
 	assert.NotNil(t, l)
-	tm.closeTopic(l)
-	// call again to verify the underlying close can be called multiple times
-	tm.closeTopic(l)
+	err = tm.returnToPool(l)
+	assert.Nil(t, err)
+	assert.Nil(t, os.RemoveAll(dir))
+}
+
+func TestTopicManagerCheckinOut(t *testing.T) {
+	topicName := "testing_test__22"
+	cc := newMockCopyCat()
+	dir := "./TestTopicManagerCheckinOut/"
+	assert.Nil(t, os.RemoveAll(dir))
+	tm, err := newTopicManager(dir, cc)
+	assert.Nil(t, err)
+
+	err = tm.createTopic(topicName)
+	assert.Nil(t, err)
+	time.Sleep(5 * time.Millisecond)
+	_, ok := tm.topicNamesToIds[topicName]
+	assert.True(t, ok)
+	assert.Equal(t, 1, len(tm.topicNamesToIds))
+
+	l1, err := tm.getTopicForName(topicName)
+	assert.Nil(t, err)
+	assert.NotNil(t, l1)
+	l2, err := tm.getTopicForName(topicName)
+	assert.Nil(t, err)
+	assert.NotNil(t, l2)
+
+	lc, ok := tm.topicNamesToLogs[topicName]
+	assert.True(t, ok)
+	assert.Equal(t, 2, lc.refCount)
+
+	err = tm.returnToPool(l1)
+	assert.Nil(t, err)
+
+	lc, ok = tm.topicNamesToLogs[topicName]
+	assert.True(t, ok)
+	assert.Equal(t, 1, lc.refCount)
+
+	err = tm.returnToPool(l2)
+	assert.Nil(t, err)
+
+	lc, ok = tm.topicNamesToLogs[topicName]
+	assert.False(t, ok)
+
 	assert.Nil(t, os.RemoveAll(dir))
 }

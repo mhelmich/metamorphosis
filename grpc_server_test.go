@@ -23,6 +23,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/mhelmich/metamorphosis/pb"
 	"github.com/stretchr/testify/assert"
@@ -177,5 +178,7 @@ func TestGrpcServerConcurrent(t *testing.T) {
 
 	producerWg.Wait()
 	consumerWg.Wait()
+	// closing a topic is defered therefore this unfortunate sleep
+	time.Sleep(100 * time.Millisecond)
 	assert.Nil(t, os.RemoveAll(dir))
 }

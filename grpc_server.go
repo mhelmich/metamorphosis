@@ -67,6 +67,8 @@ func (s *grpcServer) Publish(stream pb.MetamorphosisPubSubService_PublishServer)
 
 		if l == nil {
 			l, err = s.getLogWithName(request.Topic)
+			defer s.tm.returnToPool(l)
+
 			if err != nil {
 				stream.Send(&pb.PublishResponse{
 					Error: err.Error(),
@@ -80,7 +82,6 @@ func (s *grpcServer) Publish(stream pb.MetamorphosisPubSubService_PublishServer)
 			stream.Send(&pb.PublishResponse{
 				Error: err.Error(),
 			})
-			// TODO - figure out how to give a log back without closing it
 			return err
 		}
 
@@ -89,7 +90,6 @@ func (s *grpcServer) Publish(stream pb.MetamorphosisPubSubService_PublishServer)
 			CommittedEntryKey: request.EntryKey,
 		})
 		if err != nil {
-			// TODO - figure out how to give a log back without closing it
 			return err
 		}
 	}
@@ -113,6 +113,8 @@ func (s *grpcServer) Subscribe(stream pb.MetamorphosisPubSubService_SubscribeSer
 
 		if l == nil {
 			l, err = s.getLogWithName(request.Topic)
+			defer s.tm.returnToPool(l)
+
 			if err != nil {
 				stream.Send(&pb.SubscribeResponse{
 					Error: err.Error(),
@@ -126,7 +128,6 @@ func (s *grpcServer) Subscribe(stream pb.MetamorphosisPubSubService_SubscribeSer
 			stream.Send(&pb.SubscribeResponse{
 				Error: err.Error(),
 			})
-			// TODO - figure out how to give a log back without closing it
 			return err
 		}
 
@@ -143,7 +144,6 @@ func (s *grpcServer) Subscribe(stream pb.MetamorphosisPubSubService_SubscribeSer
 			Records: records,
 		})
 		if err != nil {
-			// TODO - figure out how to give a log back without closing it
 			return err
 		}
 	}
